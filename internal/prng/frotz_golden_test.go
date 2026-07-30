@@ -17,10 +17,9 @@ import (
 // `dfrotz -q -m -s 1234` against a synthetic Version 3 story whose only content
 // is `random 32767` and `print_num` a thousand times over. The printed values
 // were decremented to undo the opcode's `result % range + 1` scaling and hashed
-// one per line. The sister implementation at ../z3 derived it, and its
-// docs/prng-history.md records the story image, the commands, and the
-// three-way agreement between the executable, the recurrence in
-// src/common/random.c evaluated independently, and its own Go code.
+// one per line. docs/prng-history.md records the derivation in full: the story
+// image, the commands, and the three-way agreement between the executable, the
+// recurrence in src/common/random.c evaluated independently, and Go code.
 //
 // Provenance is the whole point of the constant. A digest generated from the
 // implementation it checks would only assert that the code still does what it
