@@ -1,4 +1,2 @@
-github.com/maloquacious/quetzal v0.0.0-20260730025726-592eec3a5667 h1:XPkBGrvw/lN06tv42MtyJrCWPFvf7efG2GjjLB99dsY=
-github.com/maloquacious/quetzal v0.0.0-20260730025726-592eec3a5667/go.mod h1:kvRhLSA/cA96h1mzl6uIAB97Z0gHYjJsA9qkuEd+pG4=
-github.com/maloquacious/quetzal v0.0.0-20260730170513-15772ff168ac h1:SdXSupMle1OJveRO9WZ0ZAXDmaOQQ6wSWPkPpS2/38c=
-github.com/maloquacious/quetzal v0.0.0-20260730170513-15772ff168ac/go.mod h1:kvRhLSA/cA96h1mzl6uIAB97Z0gHYjJsA9qkuEd+pG4=
+github.com/maloquacious/quetzal v0.2.2 h1:H9lGYZ9WmoZpc5bs19tsDmWy2hmhUxoQAUnJJ58a0gI=
+github.com/maloquacious/quetzal v0.2.2/go.mod h1:kvRhLSA/cA96h1mzl6uIAB97Z0gHYjJsA9qkuEd+pG4=

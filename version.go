@@ -2,10 +2,12 @@ package zmachine
 
 // version identifies this package's release, following semantic versioning.
 //
-// It is not derived from a git tag. This repository has none, so the constant
-// is the only statement of the release that exists; bumping it is a deliberate
-// edit, which is what TestVersion exists to enforce.
-const version = "0.1.0"
+// It is not derived from a git tag. The constant is the only statement of the
+// release in the source and the tag is the only one Go's module resolution can
+// see, so the two are maintained together: bumping the constant is a deliberate
+// edit, which is what TestVersion exists to enforce, and the commit that bumps
+// it is tagged to match.
+const version = "0.1.1"
 
 // Version returns the semantic version of this package.
 //
