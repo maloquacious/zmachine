@@ -100,6 +100,15 @@ saved game, produced by
 is opaque bytes to the host: store them in a column, a blob, a cache — whatever
 the application already does with a session.
 
+Each state is complete in itself rather than a link in a chain, so keeping only
+the most recent is enough, and a few hundred bytes is typical. **A state stays
+restorable as long as the story file does not change** — the engine version is
+not part of the contract, so stored state needs no migration when this package is
+upgraded, and no engine version recorded beside it. What *is* part of the
+contract is the story file itself, which makes a hash of it the right key for a
+session. See
+[Saved-state compatibility](docs/reference.md#saved-state-compatibility).
+
 ## Usage
 
 A web handler, which is the shape this package was designed around:
