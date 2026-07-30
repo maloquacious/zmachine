@@ -54,6 +54,7 @@ of this package wrote it. See
 | [pkg.go.dev](https://pkg.go.dev/github.com/maloquacious/zmachine) | Generated API documentation. Authoritative for signatures. |
 | [`docs/reference.md`](docs/reference.md) | The host-facing contract in one place: lifecycle calls, every option, every `Result` field, the error taxonomy, concurrency and limits. |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed in each release. |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability privately, and what counts as one. |
 | [`specification.md`](specification.md) | Product and architecture specification. |
 | [`docs/prng-history.md`](docs/prng-history.md) | How the Frotz generator's golden digest was derived. |
 
@@ -213,6 +214,10 @@ a request body.
   filesystem, no environment variables, no working-directory dependence. The
   engine knows nothing about HTTP, JSON, WebSockets, databases, sessions or
   terminals.
+
+Should any of that turn out to be false, [`SECURITY.md`](SECURITY.md) says how to
+report it privately, which versions get fixes, and where the line falls between a
+story misbehaving inside the VM and a story escaping it.
 
 ## Scope
 
