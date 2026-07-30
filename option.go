@@ -3,6 +3,8 @@ package zmachine
 import (
 	"fmt"
 	"log/slog"
+
+	"github.com/maloquacious/zmachine/internal/prng"
 )
 
 // Option configures a Machine. Options are applied in order by New, and an
@@ -27,7 +29,7 @@ func defaultConfig() config {
 	return config{
 		logger:           slog.New(slog.DiscardHandler),
 		instructionLimit: defaultInstructionLimit,
-		randomKind:       randomKindPCG,
+		randomKind:       prng.KindPCG,
 	}
 }
 
@@ -88,7 +90,7 @@ func WithFrotzRandomSeed(seed uint64) Option {
 	return func(c *config) error {
 		c.seed = seed
 		c.hasSeed = true
-		c.randomKind = randomKindFrotz
+		c.randomKind = prng.KindFrotz
 		return nil
 	}
 }

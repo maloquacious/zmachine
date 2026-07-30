@@ -3,6 +3,8 @@ package zmachine
 import (
 	"fmt"
 	"log/slog"
+
+	"github.com/maloquacious/zmachine/internal/prng"
 )
 
 // Machine is one execution instance of the Z-machine.
@@ -36,7 +38,7 @@ type Machine struct {
 	// random is this machine's generator, owned by it: no package-global
 	// generator is ever used. randomKind records which generator it is, so
 	// that restart can rebuild the same one.
-	random     randomSource
+	random     prng.Source
 	randomKind uint8
 	// seed is the seed the host supplied, and hasSeed reports whether it did.
 	// A seeded machine returns to that seed on restart so that a host asking
@@ -327,8 +329,8 @@ func (m *Machine) seedRandom() error {
 // setRandomSeed puts the generator into the predictable state of S 2.4.2 with
 // the given seed. Sowing the same seed twice must produce the same sequence.
 func (m *Machine) setRandomSeed(seed uint64) {
-	if m.random == nil || m.random.kind() != m.randomKind {
-		source, err := newRandomSource(m.randomKind)
+	if m.random == nil || m.random.Kind() != m.randomKind {
+		source, err := prng.New(m.randomKind)
 		if err != nil {
 			// The kind comes from the configuration, which New validated, so
 			// a bad one here is an engine bug rather than bad input.
@@ -336,23 +338,23 @@ func (m *Machine) setRandomSeed(seed uint64) {
 		}
 		m.random = source
 	}
-	m.random.seedWith(seed)
+	m.random.SeedWith(seed)
 	m.predictable = true
 }
 
 // reseedRandom puts the generator into the "random" state of S 2.4 with a seed
 // the story cannot predict.
 //
-// The entropy comes from crypto/rand, which reads the host's random source
-// directly. The engine never uses the package-global generators of math/rand
-// or math/rand/v2, so no process-global state is touched or shared between
+// The generator, and the entropy it is seeded from, belong to internal/prng.
+// Nothing in that package or this one touches the package-global generators of
+// math/rand or math/rand/v2, so no process-global state is shared between
 // machines.
 func (m *Machine) reseedRandom() error {
-	source, err := newRandomSource(m.randomKind)
+	source, err := prng.New(m.randomKind)
 	if err != nil {
-		return err
+		return randomStateError(err)
 	}
-	if err := source.reseed(); err != nil {
+	if err := source.Reseed(); err != nil {
 		return err
 	}
 	m.random = source
@@ -364,7 +366,7 @@ func (m *Machine) reseedRandom() error {
 // a request boundary, together with the predictable flag of S 2.4. The kind of
 // generator it belongs to is m.randomKind.
 func (m *Machine) randomState() ([]byte, bool, error) {
-	state, err := m.random.marshalState()
+	state, err := m.random.MarshalState()
 	if err != nil {
 		return nil, false, err
 	}
@@ -373,12 +375,12 @@ func (m *Machine) randomState() ([]byte, bool, error) {
 
 // setRandomState restores a generator state produced by randomState.
 func (m *Machine) setRandomState(kind uint8, state []byte, predictable bool) error {
-	source, err := newRandomSource(kind)
+	source, err := prng.New(kind)
 	if err != nil {
-		return err
+		return randomStateError(err)
 	}
-	if err := source.unmarshalState(state); err != nil {
-		return err
+	if err := source.UnmarshalState(state); err != nil {
+		return randomStateError(err)
 	}
 	m.random = source
 	m.randomKind = kind
@@ -389,7 +391,7 @@ func (m *Machine) setRandomState(kind uint8, state []byte, predictable bool) err
 // randomInRange returns a uniformly distributed number between 1 and n
 // inclusive (S 2.4.1). n must be positive.
 func (m *Machine) randomInRange(n int16) uint16 {
-	return m.random.draw(uint16(n))
+	return m.random.Draw(uint16(n))
 }
 
 // restart resets the machine to the state it had when the story was loaded

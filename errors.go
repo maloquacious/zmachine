@@ -3,6 +3,8 @@ package zmachine
 import (
 	"errors"
 	"fmt"
+
+	"github.com/maloquacious/zmachine/internal/prng"
 )
 
 // Sentinel errors classifying the major failure modes of the engine.
@@ -233,4 +235,17 @@ func textErrorf(addr uint32, format string, args ...any) *TextError {
 		Detail: fmt.Sprintf(format, args...),
 		Err:    ErrInvalidText,
 	}
+}
+
+// randomStateError classifies a failure from the random generator package.
+//
+// internal/prng has its own sentinel for a state it cannot read, because it
+// cannot import this package. A saved state carrying such a generator state is
+// an invalid saved state as far as a caller is concerned, so the two are joined
+// here and errors.Is finds either.
+func randomStateError(err error) error {
+	if err == nil || !errors.Is(err, prng.ErrInvalidState) {
+		return err
+	}
+	return fmt.Errorf("zmachine: %w: %w", err, ErrInvalidState)
 }

@@ -437,7 +437,7 @@ func (m *Machine) encodeRandomChunk() (quetzal.Chunk, error) {
 		flags = 1
 	}
 	data := make([]byte, 0, 3+len(state))
-	data = append(data, stateChunkVersion, flags, m.random.kind())
+	data = append(data, stateChunkVersion, flags, m.random.Kind())
 	data = append(data, state...)
 	return quetzal.Chunk{ID: chunkID(idRandom), Data: data}, nil
 }

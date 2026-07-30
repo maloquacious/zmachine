@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/maloquacious/zmachine/internal/prng"
 )
 
 // Layout of the story built by newStory. It is the story from
@@ -417,7 +419,7 @@ func TestRandomStateRoundTrip(t *testing.T) {
 		want[i] = m.randomInRange(1000)
 	}
 
-	if err := m.setRandomState(randomKindPCG, state, predictable); err != nil {
+	if err := m.setRandomState(prng.KindPCG, state, predictable); err != nil {
 		t.Fatalf("setRandomState() error = %v", err)
 	}
 	for i := range want {
@@ -426,7 +428,7 @@ func TestRandomStateRoundTrip(t *testing.T) {
 		}
 	}
 
-	if err := m.setRandomState(randomKindPCG, []byte("not a pcg state"), true); !errors.Is(err, ErrInvalidState) {
+	if err := m.setRandomState(prng.KindPCG, []byte("not a pcg state"), true); !errors.Is(err, ErrInvalidState) {
 		t.Errorf("setRandomState(garbage) error = %v, want one wrapping ErrInvalidState", err)
 	}
 }
@@ -803,4 +805,23 @@ func FuzzExecute(f *testing.F) {
 			}
 		}
 	})
+}
+
+// TestWithFrotzRandomSeedSelectsTheFrotzGenerator checks the option reaches the
+// machine, and that the machine's own draws are the reference sequence.
+func TestWithFrotzRandomSeedSelectsTheFrotzGenerator(t *testing.T) {
+	story := newTestStory(t)
+	m, err := New(story, WithFrotzRandomSeed(20000))
+	if err != nil {
+		t.Fatalf("New() error = %v, want nil", err)
+	}
+	if m.random.Kind() != prng.KindFrotz {
+		t.Fatalf("generator kind = %d, want %d", m.random.Kind(), prng.KindFrotz)
+	}
+	// The same five reference results, scaled to a range of six.
+	for i, result := range []uint16{12061, 12517, 15131, 29025, 29131} {
+		if got := m.randomInRange(6); got != result%6+1 {
+			t.Errorf("randomInRange(6) %d = %d, want %d", i, got, result%6+1)
+		}
+	}
 }
