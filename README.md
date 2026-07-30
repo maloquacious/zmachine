@@ -216,10 +216,17 @@ are passed in both directions.
 They are skipped when `dfrotz` is not installed. It is a tool the tests may use,
 never a dependency of the engine, and the package builds and tests without it.
 
+A skip reads the same as a pass in the output, so a run that means to check
+against another interpreter should set `ZMACHINE_REQUIRE_DFROTZ`, which turns a
+missing `dfrotz` into a failure instead.
+
 ```sh
 brew install frotz        # or your platform's package
-go test -run TestDifferential -v .
+ZMACHINE_REQUIRE_DFROTZ=1 go test -run TestDifferential -v .
 ```
+
+Worth running before committing, since these are the only tests that can catch a
+misreading of the standard held consistently across the whole package.
 
 ## Story fixtures and licences
 

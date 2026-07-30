@@ -52,15 +52,34 @@ var dfrotzFlags = []string{"-p", "-q", "-m", "-w", "255", "-h", "999"}
 // zork1Path is the story both interpreters run.
 const zork1Path = "testdata/stories/zork1-r119-880429.z3"
 
+// requireDfrotzEnv is the environment variable that turns a missing dfrotz from
+// a skip into a failure.
+//
+// Skipping is the right default: dfrotz is a tool these tests may use and never
+// a dependency of the engine, and the package has to build and test without it.
+// But a silent skip is indistinguishable from a pass in the output, so a run
+// that means to check against another interpreter can set this and find out
+// that it did not.
+//
+// This is a test reading its own environment, not the engine reading one. The
+// engine never consults an environment variable during execution (spec S 27),
+// and nothing here changes that.
+const requireDfrotzEnv = "ZMACHINE_REQUIRE_DFROTZ"
+
 // requireDfrotz returns the path to dfrotz, skipping the test when it is not
-// installed.
+// installed unless the environment insists it be present.
 func requireDfrotz(t *testing.T) string {
 	t.Helper()
 	path, err := exec.LookPath("dfrotz")
-	if err != nil {
-		t.Skip("dfrotz is not installed; differential tests need it")
+	if err == nil {
+		return path
 	}
-	return path
+	if os.Getenv(requireDfrotzEnv) != "" {
+		t.Fatalf("%s is set but dfrotz is not on PATH: %v", requireDfrotzEnv, err)
+	}
+	t.Skipf("dfrotz is not installed; differential tests need it. Set %s=1 to make this a failure instead.",
+		requireDfrotzEnv)
+	return ""
 }
 
 // dfrotzRun is one invocation of dfrotz.
