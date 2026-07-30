@@ -74,7 +74,12 @@ go test -race ./...
 
 ## Change Discipline
 
-- Until an upstream repository is configured, work and commit directly on the local `main` branch; do not create feature branches merely to imitate a remote pull-request workflow. Continue to commit only when the user requests it or the active workflow explicitly requires a commit.
+- Commit only when the user requests it or the active workflow explicitly requires a commit.
+- When the work resolves a GitHub issue, branch before the first commit, push the branch, and open a pull request that closes the issue. When it does not, commit directly to `main`; do not create a branch merely to imitate a pull-request workflow.
+- Assign every issue and pull request you open to `mdhender`.
+- Pull requests are squash-merged, and the repository allows no other merge method. One issue's worth of work lands as one commit on `main`, so write the pull request title and body to read as that commit.
+- Bump `version` in `version.go` for any change to code: patch for fixes, tests, and internal work that leaves exported behavior alone; minor for new or changed exported behavior. Never bump it for a documentation-only change. `version_test.go` pins the constant and is updated with it.
+- Tag the commit `vX.Y.Z` whenever that constant changes, and push the tag. Nothing else records a release: the constant is the only statement of the version in the source, and the tag is the only one Go's module resolution can see.
 - Keep behavior changes scoped to Version 3 and to the host-facing execution model in `specification.md`.
 - Update public documentation and tests whenever exported behavior changes.
 - When a VM rule is subtle, cite the relevant Z-machine specification section in the test name or a short comment; explain the rule, not the mechanics of the code.
