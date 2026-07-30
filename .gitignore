@@ -17,3 +17,12 @@
 /references/*
 !/references/references.md
 !/references/fetch.sh
+
+# Commercial story files fetched for local testing. Unlike testdata/stories,
+# which Microsoft released under the MIT License, these carry no redistribution
+# licence at all and must never be committed. Everything here stays out of git
+# except the instructions and the script that fetches them. See
+# testdata/local/README.md.
+/testdata/local/*
+!/testdata/local/README.md
+!/testdata/local/fetch.sh

@@ -11,8 +11,19 @@ the two are maintained together.
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-07-30
+
 ### Added
 
+- `testdata/local/`, holding the Lost Treasures of Infocom edition of Zork I, II
+  and III. These are commercial files with no redistribution licence, so only
+  `README.md` and `fetch.sh` are committed and the story files themselves are
+  gitignored, the way `references/` already treats what it fetches.
+- Tests over that second edition: that all three are Version 3 with the expected
+  release, serial and checksum; that each plays across a request boundary; and
+  that a saved state from Zork I release 119 is refused by a machine built from
+  release 88. The last is the story-identity rule of the compatibility policy,
+  proved against two real editions of one game rather than a constructed pair.
 - The README states the minimum Go version and why it is pinned to a patch
   release, and states that the exported API may change in a minor release before
   `v1.0.0`.
@@ -120,7 +131,8 @@ First tagged release: a headless Z-machine Version 3 execution engine.
 - **`Version()`**, which reports this package's release and deliberately claims
   no standard revision.
 
-[Unreleased]: https://github.com/maloquacious/zmachine/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/maloquacious/zmachine/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/maloquacious/zmachine/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/maloquacious/zmachine/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/maloquacious/zmachine/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/maloquacious/zmachine/compare/v0.1.0...v0.1.1
