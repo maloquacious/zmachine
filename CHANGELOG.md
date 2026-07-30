@@ -11,6 +11,18 @@ the two are maintained together.
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-07-30
+
+### Changed
+
+- **The minimum Go version is now 1.26, down from 1.26.4.** The patch-level
+  requirement was never this module's: `github.com/maloquacious/quetzal`
+  declared `go 1.26.4`, and Go requires a module's `go` directive to be at least
+  that of everything it depends on, so the pin was inherited and could not be
+  edited out. Quetzal `v0.2.3` relaxes its own directive, and this follows.
+  Builds on Go 1.26.0 through 1.26.3 are no longer refused.
+- `github.com/maloquacious/quetzal` upgraded from `v0.2.2` to `v0.2.3`.
+
 ### Added
 
 - A saved-state compatibility policy in `docs/reference.md`, with a summary in
@@ -141,7 +153,8 @@ First tagged release: a headless Z-machine Version 3 execution engine.
 - **`Version()`**, which reports this package's release and deliberately claims
   no standard revision.
 
-[Unreleased]: https://github.com/maloquacious/zmachine/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/maloquacious/zmachine/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/maloquacious/zmachine/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/maloquacious/zmachine/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/maloquacious/zmachine/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/maloquacious/zmachine/compare/v0.1.1...v0.1.2
