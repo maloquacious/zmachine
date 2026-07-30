@@ -23,6 +23,31 @@ The whole package is one invariant:
 go get github.com/maloquacious/zmachine
 ```
 
+### Requirements
+
+**Go 1.26.4 or later.** That the requirement is pinned to a patch release rather
+than to `1.26` is not this module's choice: `github.com/maloquacious/quetzal`
+declares `go 1.26.4`, and Go requires a module's `go` directive to be at least
+that of everything it depends on. A build on Go 1.26.3 will be refused, and
+`go mod tidy` restores the patch level if it is edited out.
+
+There are no other dependencies. Nothing outside the standard library and
+Quetzal is imported by the engine.
+
+### Stability
+
+This package is at `v0.x`. Under semantic versioning that means **the exported
+API may change in a minor release**, and this project's own rule is to bump the
+minor for new or changed exported behaviour and the patch for everything else.
+Pin a version and read [`CHANGELOG.md`](CHANGELOG.md) before upgrading.
+
+What `v1.0.0` will mean, when it arrives, is that the exported API stops moving
+without a major version. It does not exist yet.
+
+One thing that is *not* yet settled is how long a `Result.State` written by one
+version stays restorable by a later one. A host persisting saved state across
+upgrades should treat that as an open question until it is answered.
+
 ## Documentation
 
 | Where | What |

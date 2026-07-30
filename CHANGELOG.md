@@ -11,6 +11,12 @@ the two are maintained together.
 
 ## [Unreleased]
 
+### Added
+
+- The README states the minimum Go version and why it is pinned to a patch
+  release, and states that the exported API may change in a minor release before
+  `v1.0.0`.
+
 ## [0.1.3] — 2026-07-30
 
 Documentation only. No behaviour changed; the two `.go` files touched carry
