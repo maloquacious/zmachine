@@ -73,7 +73,9 @@ const (
 	// later revision of either payload can be told from this one. A chunk whose
 	// version is not understood is ignored rather than refused: it belongs to
 	// this engine, and the fallbacks below are safe.
-	stateChunkVersion = 1
+	//
+	// Version 2 added the generator byte to the random chunk.
+	stateChunkVersion = 2
 
 	// maxRandomStateBytes bounds the marshalled generator state a save may
 	// carry. math/rand/v2's PCG marshals to 20 bytes; the ceiling is generous
@@ -144,10 +146,14 @@ func (m *Machine) snapshot() ([]byte, error) {
 // it is checked before anything is allocated or written; malformed state
 // returns an error and never panics.
 //
-// A successful restore leaves the machine where the snapshot was taken: on the
-// line-input instruction that asked for a command. The next call is Run, which
-// supplies the line. On failure the machine is left exactly as it was, so a
-// host may report the error and retry with different state.
+// A successful restore leaves the machine at an input boundary, so that the
+// next call is Run, which supplies a line. On failure the machine is left
+// exactly as it was, so a host may report the error and retry with different
+// state.
+//
+// Saves written by this engine and saves written by another interpreter
+// suspend in different places, and Restore accepts both; see
+// resumeForeignSave.
 func (m *Machine) Restore(data []byte) error {
 	if len(data) == 0 {
 		return fmt.Errorf("zmachine: Restore: no saved state: %w", ErrInvalidState)
@@ -205,6 +211,14 @@ func (m *Machine) Restore(data []byte) error {
 		return err
 	}
 	m.restoreScreenChunk(save.Chunks)
+
+	// A save this engine did not write suspends somewhere else entirely, and
+	// the program counter has to be moved before the machine can run.
+	if !ownSnapshot(save.Chunks) {
+		if err := m.resumeForeignSave(); err != nil {
+			return err
+		}
+	}
 
 	// S 11.1: the header fields describing the interpreter belong to this
 	// machine and not to the machine that wrote the save, so they are set again
@@ -402,7 +416,13 @@ func (m *Machine) checkRestoredPC(pc uint32) error {
 // described at the top of this file.
 //
 // The payload is a version byte, a flags byte whose bit 0 is the "predictable"
-// state of S 2.4, and the marshalled generator state.
+// state of S 2.4, a byte naming which generator the state belongs to, and the
+// marshalled generator state itself.
+//
+// The generator is named because this engine has more than one: the default,
+// and the Frotz-compatible generator used for differential testing (S 33).
+// Reading a state back into the wrong generator would produce plausible
+// numbers from the wrong sequence, which is worse than refusing it.
 func (m *Machine) encodeRandomChunk() (quetzal.Chunk, error) {
 	state, predictable, err := m.randomState()
 	if err != nil {
@@ -416,8 +436,8 @@ func (m *Machine) encodeRandomChunk() (quetzal.Chunk, error) {
 	if predictable {
 		flags = 1
 	}
-	data := make([]byte, 0, 2+len(state))
-	data = append(data, stateChunkVersion, flags)
+	data := make([]byte, 0, 3+len(state))
+	data = append(data, stateChunkVersion, flags, m.random.kind())
 	data = append(data, state...)
 	return quetzal.Chunk{ID: chunkID(idRandom), Data: data}, nil
 }
@@ -433,19 +453,19 @@ func (m *Machine) encodeRandomChunk() (quetzal.Chunk, error) {
 // known.
 func (m *Machine) restoreRandomChunk(chunks []quetzal.Chunk) error {
 	data, ok := findChunk(chunks, idRandom)
-	if !ok || len(data) < 2 || data[0] != stateChunkVersion {
+	if !ok || len(data) < 3 || data[0] != stateChunkVersion {
 		if ok {
 			m.logger.Warn("saved state carries a random generator chunk this engine cannot read; reseeding",
 				slog.Int("bytes", len(data)))
 		}
 		return m.seedRandom()
 	}
-	state := data[2:]
+	state := data[3:]
 	if len(state) > maxRandomStateBytes {
 		return fmt.Errorf("zmachine: Restore: the saved random generator state is %d bytes, more than the %d permitted: %w",
 			len(state), maxRandomStateBytes, ErrInvalidState)
 	}
-	if err := m.setRandomState(state, data[1]&1 != 0); err != nil {
+	if err := m.setRandomState(data[2], state, data[1]&1 != 0); err != nil {
 		return fmt.Errorf("zmachine: Restore: %w", err)
 	}
 	return nil
@@ -565,4 +585,76 @@ func restoreError(err error) error {
 			mismatch.Save, mismatch.Story, err, ErrInvalidState)
 	}
 	return fmt.Errorf("zmachine: Restore: reading the saved state: %w: %w", err, ErrInvalidState)
+}
+
+// ownSnapshot reports whether a save was written by this engine.
+//
+// The custom chunks are the mark. Another interpreter has no reason to write
+// them and would not know what to put in them, so their presence identifies a
+// snapshot this engine produced, and their absence a save from somewhere else.
+func ownSnapshot(chunks []quetzal.Chunk) bool {
+	if _, ok := findChunk(chunks, idScreen); ok {
+		return true
+	}
+	_, ok := findChunk(chunks, idRandom)
+	return ok
+}
+
+// resumeForeignSave moves the program counter to where a save written by
+// another interpreter should resume.
+//
+// The two kinds of save suspend at different instructions, and the difference
+// is not a disagreement about the format but about what was happening when the
+// state was written.
+//
+// This engine snapshots automatically at an input boundary, so its program
+// counter is the address of the read instruction that asked for the line, and
+// resuming means executing that instruction again with input available. Quetzal
+// has no way to describe that, because it was designed for the other case: a
+// story that executed the save instruction itself. There, S 6.1.2 requires
+// execution to continue from the save, and in Version 3 save is a branch
+// instruction, so Quetzal records the address of its branch data.
+//
+// Restoring such a save therefore means reading that branch and taking it as
+// though save had just reported success, which is what the story is waiting to
+// be told. Execution then runs on to the next read, which is where the machine
+// stops and the host supplies a line.
+func (m *Machine) resumeForeignSave() error {
+	branch, next, err := decodeBranchAt(m.mem, m.pc)
+	if err != nil {
+		return fmt.Errorf("zmachine: Restore: reading the branch of the save instruction at 0x%04x: %w: %w",
+			m.pc, err, ErrInvalidState)
+	}
+
+	m.logger.Debug("restoring a save written by another interpreter",
+		slog.Uint64("pc", uint64(m.pc)),
+		slog.Bool("branch_on_true", branch.onTrue))
+
+	// The condition is "the save succeeded", and it did: the state is loaded.
+	if !branch.onTrue {
+		// The story asked to branch when save failed, so success falls through
+		// to the instruction after the branch data.
+		m.pc = next
+		return nil
+	}
+
+	if returns, value := branch.returns(); returns {
+		// S 4.7.1: the offsets 0 and 1 return from the current routine rather
+		// than jumping.
+		result := uint16(0)
+		if value {
+			result = 1
+		}
+		if err := m.returnFromRoutine(result); err != nil {
+			return fmt.Errorf("zmachine: Restore: returning from the save instruction: %w: %w", err, ErrInvalidState)
+		}
+		return nil
+	}
+
+	target, err := branch.target(next)
+	if err != nil {
+		return fmt.Errorf("zmachine: Restore: the save instruction branches outside the story: %w: %w", err, ErrInvalidState)
+	}
+	m.pc = target
+	return nil
 }

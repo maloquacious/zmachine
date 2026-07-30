@@ -1158,3 +1158,111 @@ func equalWords(a, b []uint16) bool {
 	}
 	return true
 }
+
+// TestRestoreForeignSaveTakesTheSaveBranch covers a saved state written by
+// another interpreter (S 6.1.2, and Quetzal's definition of the IFhd program
+// counter for Version 3).
+//
+// The differential tests exercise this against a real save from dfrotz, but
+// they are skipped where dfrotz is not installed, and this path is too easy to
+// break to leave uncovered. The save here is built by hand, so it runs
+// everywhere.
+//
+// A save this engine did not write suspends inside the save instruction, and
+// Quetzal records the address of that instruction's branch data. Restoring it
+// means reading the branch and taking it as though save had reported success.
+func TestRestoreForeignSaveTakesTheSaveBranch(t *testing.T) {
+	// The branch data sits at the start of the code area. Bit 7 set means
+	// branch when the condition is true, bit 6 set means a one-byte branch,
+	// and the bottom six bits are the offset: 0x40|0x80|20 branches forward by
+	// 20 from the byte after the branch data, less two (S 4.7, S 4.7.2).
+	const offset = 20
+	branchByte := byte(0x80 | 0x40 | offset)
+
+	for _, tc := range []struct {
+		name   string
+		branch byte
+		wantPC uint32
+	}{
+		{
+			// next is machineCodeBase+1, and the target is next+offset-2.
+			name:   "branch on true is taken because the restore succeeded",
+			branch: branchByte,
+			wantPC: machineCodeBase + 1 + offset - 2,
+		},
+		{
+			// Bit 7 clear asks to branch when save failed. It did not, so
+			// execution falls through to the byte after the branch data.
+			name:   "branch on false falls through",
+			branch: byte(0x40 | offset),
+			wantPC: machineCodeBase + 1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newTestMachine(t, tc.branch)
+
+			// A save from another interpreter, carrying none of this engine's
+			// custom chunks.
+			story, err := m.quetzalStory()
+			if err != nil {
+				t.Fatalf("quetzalStory() error = %v", err)
+			}
+			foreign := &quetzal.Save{
+				Header: quetzal.Header{
+					Release:  story.Release,
+					Serial:   story.Serial,
+					Checksum: story.Checksum,
+					PC:       machineCodeBase,
+				},
+				Memory: quetzal.Memory{
+					Encoding: quetzal.MemoryCompressed,
+					Data:     append([]byte(nil), m.mem.dynamic...),
+				},
+				// Every non-version-6 save begins with the dummy frame that
+				// holds the top-level evaluation stack.
+				Frames: []quetzal.Frame{{}},
+			}
+			var buf bytes.Buffer
+			if err := quetzal.Write(&buf, story, foreign); err != nil {
+				t.Fatalf("writing the foreign save: %v", err)
+			}
+
+			if err := m.Restore(buf.Bytes()); err != nil {
+				t.Fatalf("Restore(a save from another interpreter) error = %v, want nil", err)
+			}
+			if m.pc != tc.wantPC {
+				t.Errorf("program counter after restoring = 0x%04x, want 0x%04x", m.pc, tc.wantPC)
+			}
+		})
+	}
+}
+
+// TestOwnSnapshotIsRecognised checks the mark that tells this engine's saves
+// from another interpreter's, since restoring them means resuming in different
+// places.
+func TestOwnSnapshotIsRecognised(t *testing.T) {
+	story := loadZork1(t)
+	m, err := New(story, WithRandomSeed(zork1Seed))
+	if err != nil {
+		t.Fatalf("New() error = %v, want nil", err)
+	}
+	result, err := m.Start(context.Background())
+	if err != nil {
+		t.Fatalf("Start() error = %v, want nil", err)
+	}
+
+	qstory, err := m.quetzalStory()
+	if err != nil {
+		t.Fatalf("quetzalStory() error = %v", err)
+	}
+	save, err := quetzal.Read(bytes.NewReader(result.State), qstory)
+	if err != nil {
+		t.Fatalf("reading this engine's own snapshot: %v", err)
+	}
+	if !ownSnapshot(save.Chunks) {
+		t.Error("this engine did not recognise its own snapshot")
+	}
+	if ownSnapshot(nil) {
+		t.Error("a save with no chunks was taken for this engine's own")
+	}
+}

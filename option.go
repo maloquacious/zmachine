@@ -16,6 +16,7 @@ type config struct {
 	tracer           Tracer
 	seed             uint64
 	hasSeed          bool
+	randomKind       uint8
 	instructionLimit uint64
 }
 
@@ -26,6 +27,7 @@ func defaultConfig() config {
 	return config{
 		logger:           slog.New(slog.DiscardHandler),
 		instructionLimit: defaultInstructionLimit,
+		randomKind:       randomKindPCG,
 	}
 }
 
@@ -60,6 +62,33 @@ func WithRandomSeed(seed uint64) Option {
 	return func(c *config) error {
 		c.seed = seed
 		c.hasSeed = true
+		return nil
+	}
+}
+
+// WithFrotzRandomSeed makes the machine draw random numbers exactly as Frotz
+// does, seeded as "dfrotz -s seed" would seed it.
+//
+// It exists so that this engine's behaviour can be compared against another
+// interpreter's, turn for turn, on stories that consult the random number
+// generator (spec S 33). S 2.4 fixes only that a seeded generator be
+// reproducible, not which numbers it yields, so two conforming interpreters
+// disagree from the first draw and no text comparison past that point means
+// anything. Matching Frotz's generator is the only way to make the comparison
+// possible.
+//
+// It is not a better generator than the default and carries Frotz's own
+// quirks. In particular Frotz's seed_random treats a seed below 1000 as a
+// request to count from 0 to seed-1 forever rather than to generate at all, so
+// a comparison against dfrotz should use a seed of at least 1000, and so
+// should this. A seed of 0 asks for entropy, exactly as it does in Frotz.
+//
+// Ordinary use of this package wants WithRandomSeed instead.
+func WithFrotzRandomSeed(seed uint64) Option {
+	return func(c *config) error {
+		c.seed = seed
+		c.hasSeed = true
+		c.randomKind = randomKindFrotz
 		return nil
 	}
 }

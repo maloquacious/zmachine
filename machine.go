@@ -1,11 +1,8 @@
 package zmachine
 
 import (
-	crand "crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
 )
 
 // Machine is one execution instance of the Z-machine.
@@ -36,10 +33,11 @@ type Machine struct {
 	maxStack int
 	maxDepth int
 
-	// pcg is this machine's random source and rng draws from it. Both are
-	// owned by the machine: no package-global generator is ever used.
-	pcg *rand.PCG
-	rng *rand.Rand
+	// random is this machine's generator, owned by it: no package-global
+	// generator is ever used. randomKind records which generator it is, so
+	// that restart can rebuild the same one.
+	random     randomSource
+	randomKind uint8
 	// seed is the seed the host supplied, and hasSeed reports whether it did.
 	// A seeded machine returns to that seed on restart so that a host asking
 	// for reproducible execution keeps it (S 2.4 leaves the post-restart state
@@ -250,6 +248,7 @@ func New(story *Story, opts ...Option) (*Machine, error) {
 		maxDepth:         defaultCallDepthLimit,
 		seed:             cfg.seed,
 		hasSeed:          cfg.hasSeed,
+		randomKind:       cfg.randomKind,
 		logger:           cfg.logger,
 		tracer:           cfg.tracer,
 		instructionLimit: cfg.instructionLimit,
@@ -328,12 +327,16 @@ func (m *Machine) seedRandom() error {
 // setRandomSeed puts the generator into the predictable state of S 2.4.2 with
 // the given seed. Sowing the same seed twice must produce the same sequence.
 func (m *Machine) setRandomSeed(seed uint64) {
-	// PCG takes a 128-bit seed. The second word is a fixed constant so that
-	// the whole state is a function of the seed alone, which is what S 2.4.2
-	// requires, and PCG's mixing means a very low seed - S 2.4.2 mentions 10 -
-	// is still a usable starting point.
-	m.pcg = rand.NewPCG(seed, 0x9e3779b97f4a7c15)
-	m.rng = rand.New(m.pcg)
+	if m.random == nil || m.random.kind() != m.randomKind {
+		source, err := newRandomSource(m.randomKind)
+		if err != nil {
+			// The kind comes from the configuration, which New validated, so
+			// a bad one here is an engine bug rather than bad input.
+			panic(err)
+		}
+		m.random = source
+	}
+	m.random.seedWith(seed)
 	m.predictable = true
 }
 
@@ -345,35 +348,40 @@ func (m *Machine) setRandomSeed(seed uint64) {
 // or math/rand/v2, so no process-global state is touched or shared between
 // machines.
 func (m *Machine) reseedRandom() error {
-	var b [16]byte
-	if _, err := crand.Read(b[:]); err != nil {
-		return fmt.Errorf("zmachine: seeding the random number generator: %w", err)
+	source, err := newRandomSource(m.randomKind)
+	if err != nil {
+		return err
 	}
-	m.pcg = rand.NewPCG(binary.BigEndian.Uint64(b[0:8]), binary.BigEndian.Uint64(b[8:16]))
-	m.rng = rand.New(m.pcg)
+	if err := source.reseed(); err != nil {
+		return err
+	}
+	m.random = source
 	m.predictable = false
 	return nil
 }
 
 // randomState returns the generator's state, so that it can be carried across
-// a request boundary. It is the marshalled PCG state together with the
-// predictable flag of S 2.4.
+// a request boundary, together with the predictable flag of S 2.4. The kind of
+// generator it belongs to is m.randomKind.
 func (m *Machine) randomState() ([]byte, bool, error) {
-	state, err := m.pcg.MarshalBinary()
+	state, err := m.random.marshalState()
 	if err != nil {
-		return nil, false, fmt.Errorf("zmachine: reading the random number generator state: %w", err)
+		return nil, false, err
 	}
 	return state, m.predictable, nil
 }
 
 // setRandomState restores a generator state produced by randomState.
-func (m *Machine) setRandomState(state []byte, predictable bool) error {
-	pcg := &rand.PCG{}
-	if err := pcg.UnmarshalBinary(state); err != nil {
-		return fmt.Errorf("zmachine: restoring the random number generator state: %w: %w", err, ErrInvalidState)
+func (m *Machine) setRandomState(kind uint8, state []byte, predictable bool) error {
+	source, err := newRandomSource(kind)
+	if err != nil {
+		return err
 	}
-	m.pcg = pcg
-	m.rng = rand.New(pcg)
+	if err := source.unmarshalState(state); err != nil {
+		return err
+	}
+	m.random = source
+	m.randomKind = kind
 	m.predictable = predictable
 	return nil
 }
@@ -381,7 +389,7 @@ func (m *Machine) setRandomState(state []byte, predictable bool) error {
 // randomInRange returns a uniformly distributed number between 1 and n
 // inclusive (S 2.4.1). n must be positive.
 func (m *Machine) randomInRange(n int16) uint16 {
-	return uint16(m.rng.IntN(int(n))) + 1
+	return m.random.draw(uint16(n))
 }
 
 // restart resets the machine to the state it had when the story was loaded

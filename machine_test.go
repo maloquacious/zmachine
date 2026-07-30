@@ -417,7 +417,7 @@ func TestRandomStateRoundTrip(t *testing.T) {
 		want[i] = m.randomInRange(1000)
 	}
 
-	if err := m.setRandomState(state, predictable); err != nil {
+	if err := m.setRandomState(randomKindPCG, state, predictable); err != nil {
 		t.Fatalf("setRandomState() error = %v", err)
 	}
 	for i := range want {
@@ -426,7 +426,7 @@ func TestRandomStateRoundTrip(t *testing.T) {
 		}
 	}
 
-	if err := m.setRandomState([]byte("not a pcg state"), true); !errors.Is(err, ErrInvalidState) {
+	if err := m.setRandomState(randomKindPCG, []byte("not a pcg state"), true); !errors.Is(err, ErrInvalidState) {
 		t.Errorf("setRandomState(garbage) error = %v, want one wrapping ErrInvalidState", err)
 	}
 }

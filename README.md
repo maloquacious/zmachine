@@ -133,6 +133,15 @@ machine, err := zmachine.New(story,
 A `Machine` with no options discards its diagnostics — it never falls back to
 `slog.Default` — and seeds itself unpredictably.
 
+There is one further option, `WithFrotzRandomSeed`, which makes the machine draw
+random numbers exactly as Frotz does. It exists so that this engine can be
+compared against `dfrotz` turn for turn on stories that use randomness, and it
+is not meant for running a real session: the Z-machine standard fixes only that
+a seeded generator be reproducible, not which numbers it yields, so two correct
+interpreters disagree from the first draw. It also inherits Frotz's own quirk
+that a seed below 1000 counts rather than generating, so a comparison should use
+a larger one. Ordinary use wants `WithRandomSeed`.
+
 ## Safety in a server
 
 Story files and saved states are both treated as hostile binary input, because
@@ -194,6 +203,23 @@ Integration tests play Zork I across dozens of create/restore/run/destroy cycles
 and assert that it matches continuous execution turn for turn. Fuzz targets cover
 every parser exposed to arbitrary bytes: the story header, the instruction
 decoder, the Z-string decoder, the object tables and the state adapter.
+
+### Differential tests against Frotz
+
+A separate set of tests compares this engine against `dfrotz`, which is a
+different and harder claim than agreeing with our own reading of the standard: a
+misreading held consistently throughout this package would satisfy every other
+test and fail these. They run in three layers — the transcript, the status line,
+and saved state, where dynamic memory is compared byte for byte and save files
+are passed in both directions.
+
+They are skipped when `dfrotz` is not installed. It is a tool the tests may use,
+never a dependency of the engine, and the package builds and tests without it.
+
+```sh
+brew install frotz        # or your platform's package
+go test -run TestDifferential -v .
+```
 
 ## Story fixtures and licences
 

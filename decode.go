@@ -481,3 +481,21 @@ func (d *decoder) fail(cause error, format string, args ...any) *DecodeError {
 		Err:    cause,
 	}
 }
+
+// decodeBranchAt reads branch data standing on its own at addr, rather than as
+// part of an instruction being decoded.
+//
+// It exists for restoring a saved state written by another interpreter. Quetzal
+// records the program counter of a Version 3 save as the address of the branch
+// data belonging to the save instruction itself, so resuming such a save means
+// reading that branch without the instruction in front of it.
+//
+// It returns the branch and the address of the byte after it.
+func decodeBranchAt(m *memory, addr uint32) (branchInfo, uint32, error) {
+	d := &decoder{m: m, addr: addr, at: addr}
+	b, err := d.branch()
+	if err != nil {
+		return branchInfo{}, 0, err
+	}
+	return b, d.at, nil
+}
