@@ -152,8 +152,9 @@ func (m *Machine) snapshot() ([]byte, error) {
 // state.
 //
 // Saves written by this engine and saves written by another interpreter
-// suspend in different places, and Restore accepts both; see
-// resumeForeignSave.
+// suspend in different places, and Restore accepts both: a save this engine did
+// not write has its program counter moved to the input boundary this engine
+// resumes from.
 func (m *Machine) Restore(data []byte) error {
 	if len(data) == 0 {
 		return fmt.Errorf("zmachine: Restore: no saved state: %w", ErrInvalidState)

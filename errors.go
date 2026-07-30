@@ -9,8 +9,16 @@ import (
 
 // Sentinel errors classifying the major failure modes of the engine.
 //
-// Every error returned by this package wraps exactly one of these, so callers
-// can classify failures with errors.Is without depending on message text.
+// Every error arising from a story, a saved state or execution wraps exactly
+// one of these, so callers can classify failures with errors.Is without
+// depending on message text.
+//
+// Two kinds of error deliberately do not. A cancelled context is reported as
+// the context's own error, so that errors.Is finds context.Canceled or
+// context.DeadlineExceeded as a caller expects. A nil context, or an option
+// given a nil logger, a nil tracer or a zero instruction limit, reports a
+// mistake at the call site rather than anything derived from untrusted input,
+// and is a plain error naming the call.
 var (
 	// ErrInvalidStory reports a story file that is not a usable Version 3 story.
 	ErrInvalidStory = errors.New("invalid Z3 story")
