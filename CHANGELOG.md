@@ -11,6 +11,27 @@ the two are maintained together.
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-07-30
+
+Documentation, plus the test that holds one of the documents to its word. No
+exported behaviour changed.
+
+### Added
+
+- `docs/tutorial.md`, a first session end to end: load Zork I, start it, play a
+  command, and then play three more on a `Machine` created and discarded for
+  each one. It is the missing learning-oriented document — the README argues and
+  the reference describes, and neither is a lesson.
+- `tutorial_test.go`, which runs the tutorial's own program and compares what it
+  prints against the blocks the tutorial shows. A tutorial's reader is the one
+  person who cannot tell a stale example from their own mistake, so the tutorial
+  is not allowed to rot quietly.
+- `docs/how-to/`, three guides titled as the goals they achieve: persist and
+  restore session state, handle a cancelled request mid-turn, and serve many
+  concurrent players from one story. Between the README and the reference there
+  was no document that answered "I want to do X — how?".
+- Links to both from the README, the reference and each other.
+
 ## [0.1.5] — 2026-07-30
 
 ### Changed
@@ -153,7 +174,8 @@ First tagged release: a headless Z-machine Version 3 execution engine.
 - **`Version()`**, which reports this package's release and deliberately claims
   no standard revision.
 
-[Unreleased]: https://github.com/maloquacious/zmachine/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/maloquacious/zmachine/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/maloquacious/zmachine/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/maloquacious/zmachine/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/maloquacious/zmachine/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/maloquacious/zmachine/compare/v0.1.2...v0.1.3
