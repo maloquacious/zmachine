@@ -3,8 +3,10 @@
 Technical description of the host-facing API of
 `github.com/maloquacious/zmachine`.
 
-This document describes the machinery. For why the package is shaped this way,
-see the [README](../README.md); for the full per-symbol signatures, see
+This document describes the machinery. For a first session, see the
+[tutorial](tutorial.md); for the goals a host has, the
+[how-to guides](how-to/); for why the package is shaped this way, the
+[README](../README.md); for the full per-symbol signatures, see
 [pkg.go.dev](https://pkg.go.dev/github.com/maloquacious/zmachine), which is
 generated from the source and is authoritative for anything this document and
 the code disagree about.

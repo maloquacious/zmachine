@@ -49,6 +49,8 @@ of this package wrote it. See
 
 | Where | What |
 | --- | --- |
+| [`docs/tutorial.md`](docs/tutorial.md) | A first session, end to end: load Zork I, play three turns, and rebuild the machine between them. Start here. |
+| [`docs/how-to/`](docs/how-to/) | Guides for a host's real goals: storing session state, handling a cancelled request, serving many players at once. |
 | [pkg.go.dev](https://pkg.go.dev/github.com/maloquacious/zmachine) | Generated API documentation. Authoritative for signatures. |
 | [`docs/reference.md`](docs/reference.md) | The host-facing contract in one place: lifecycle calls, every option, every `Result` field, the error taxonomy, concurrency and limits. |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed in each release. |
@@ -56,7 +58,9 @@ of this package wrote it. See
 | [`docs/prng-history.md`](docs/prng-history.md) | How the Frotz generator's golden digest was derived. |
 
 This README is the front door: what the package is, why it is shaped this way,
-and enough to get a first turn running.
+and enough to get a first turn running. A reader who would rather run something
+than read about it should go to the
+[tutorial](docs/tutorial.md) instead and come back.
 
 ## The request-oriented model
 
