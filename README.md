@@ -242,6 +242,10 @@ go test -run '^$' -fuzz FuzzRestore -fuzztime 30s .
 
 Unit tests cover each layer against small, hand-built machine states rather than
 whole stories, so a rule is proved by the smallest thing that can express it.
+The `Example` functions in `example_test.go` are the samples a host copies —
+load and start, run a turn, restore between turns, classify an error — and they
+are compiled and run like any other test, so a changed signature breaks a build
+rather than a reader.
 Integration tests play Zork I across dozens of create/restore/run/destroy cycles
 and assert that it matches continuous execution turn for turn. Fuzz targets cover
 every parser exposed to arbitrary bytes: the story header, the instruction
