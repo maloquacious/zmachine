@@ -11,6 +11,20 @@ the two are maintained together.
 
 ## [Unreleased]
 
+### Added
+
+- `SECURITY.md`. The package claims that hostile story files and saved states
+  cannot panic it, over-allocate, read out of bounds or outrun their limits;
+  until now there was no answer to the obvious next question, which is what to do
+  when the claim turns out to be false. It gives the private reporting channel —
+  GitHub private vulnerability reporting, now enabled on the repository — states
+  that only the most recent release gets fixes, and draws the line that matters:
+  a story misbehaving inside the VM is the story's business, a story escaping it
+  is ours. It also bounds the threat model, since an engine with no filesystem,
+  network or process access has nothing to escalate to and a ceiling of
+  availability.
+- A link to it from the README's safety section and its documentation table.
+
 ## [0.1.6] — 2026-07-30
 
 Documentation, plus the test that holds one of the documents to its word. No
