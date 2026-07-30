@@ -1,0 +1,19 @@
+*~
+*.log
+*.swp
+
+# IDE, agents
+.idea/
+
+# build files
+/zmachine
+
+# Specifications fetched for local reference. The Z-Machine Standards Document
+# is CC BY-SA 4.0, (c) 1993-2018 IFTF, so it could be committed with
+# attribution; it stays out of the tree to keep a share-alike work separate
+# from an MIT-licensed repository, not because the licence forbids it. See
+# references/references.md. Everything here stays out of git except the
+# instructions.
+/references/*
+!/references/references.md
+!/references/fetch.sh
