@@ -26,6 +26,12 @@ var (
 	// ErrExecutionLimit reports that execution stopped because a host-imposed
 	// limit was reached.
 	ErrExecutionLimit = errors.New("execution limit exceeded")
+
+	// ErrInvalidText reports encoded text that does not obey the Version 3
+	// rules for Z-strings. It is distinct from ErrInvalidStory because strings
+	// may be built in dynamic memory while the story runs, so a malformed
+	// string is not necessarily a defect in the story file.
+	ErrInvalidText = errors.New("invalid Z-string")
 )
 
 // Region names one of the three regions of the Z-machine memory map
@@ -133,6 +139,26 @@ func (e *MemoryError) Error() string {
 // Unwrap returns the sentinel classifying this error.
 func (e *MemoryError) Unwrap() error { return e.Err }
 
+// TextError describes encoded text that could not be decoded. It always wraps
+// ErrInvalidText unless a caller constructs it otherwise.
+type TextError struct {
+	// Addr is the byte address the string was read from, or zero when the text
+	// did not come from story memory.
+	Addr uint32
+	// Detail explains what is wrong with the text.
+	Detail string
+	// Err is the sentinel this error is classified as.
+	Err error
+}
+
+// Error implements error.
+func (e *TextError) Error() string {
+	return fmt.Sprintf("zmachine: Z-string at 0x%04x: %s", e.Addr, e.Detail)
+}
+
+// Unwrap returns the sentinel classifying this error.
+func (e *TextError) Unwrap() error { return e.Err }
+
 // storyErrorf builds a StoryError classified as ErrInvalidStory.
 func storyErrorf(field string, value uint32, format string, args ...any) *StoryError {
 	return &StoryError{
@@ -140,5 +166,14 @@ func storyErrorf(field string, value uint32, format string, args ...any) *StoryE
 		Value:  value,
 		Detail: fmt.Sprintf(format, args...),
 		Err:    ErrInvalidStory,
+	}
+}
+
+// textErrorf builds a TextError classified as ErrInvalidText.
+func textErrorf(addr uint32, format string, args ...any) *TextError {
+	return &TextError{
+		Addr:   addr,
+		Detail: fmt.Sprintf(format, args...),
+		Err:    ErrInvalidText,
 	}
 }
