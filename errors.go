@@ -139,6 +139,31 @@ func (e *MemoryError) Error() string {
 // Unwrap returns the sentinel classifying this error.
 func (e *MemoryError) Unwrap() error { return e.Err }
 
+// DecodeError describes an instruction that could not be decoded. It wraps the
+// sentinel that classifies the failure: ErrInvalidOpcode for an instruction
+// Version 3 does not define, and the refused memory access - and so
+// ErrMemoryAccess - for one that runs off the end of the story.
+type DecodeError struct {
+	// Addr is the byte address of the instruction, which is the program counter
+	// it was decoded from.
+	Addr uint32
+	// Opcode is the first byte of the instruction. It is zero when the failure
+	// was reading that byte itself.
+	Opcode uint8
+	// Detail explains what is wrong with the instruction.
+	Detail string
+	// Err is the error this one is classified as.
+	Err error
+}
+
+// Error implements error.
+func (e *DecodeError) Error() string {
+	return fmt.Sprintf("zmachine: instruction at 0x%04x: opcode byte 0x%02x: %s", e.Addr, e.Opcode, e.Detail)
+}
+
+// Unwrap returns the error classifying this one.
+func (e *DecodeError) Unwrap() error { return e.Err }
+
 // TextError describes encoded text that could not be decoded. It always wraps
 // ErrInvalidText unless a caller constructs it otherwise.
 type TextError struct {
