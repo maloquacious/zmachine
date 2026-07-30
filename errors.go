@@ -32,6 +32,19 @@ var (
 	// may be built in dynamic memory while the story runs, so a malformed
 	// string is not necessarily a defect in the story file.
 	ErrInvalidText = errors.New("invalid Z-string")
+
+	// ErrExecutionFault reports a story that ran into a condition the
+	// Z-machine does not define a result for: dividing by zero (S 2.3.1),
+	// underflowing the evaluation stack (S 6.3.1), returning from the initial
+	// execution environment (S 5.5), and so on. The story is at fault, not the
+	// engine, so these are ordinary errors and never panics.
+	ErrExecutionFault = errors.New("execution fault")
+
+	// ErrNotImplemented reports an instruction that this build of the engine
+	// does not yet execute. It is distinct from ErrInvalidOpcode: the
+	// instruction is legal Version 3 and decodes correctly, but the machinery
+	// it needs is not present.
+	ErrNotImplemented = errors.New("opcode not implemented")
 )
 
 // Region names one of the three regions of the Z-machine memory map
@@ -183,6 +196,32 @@ func (e *TextError) Error() string {
 
 // Unwrap returns the sentinel classifying this error.
 func (e *TextError) Unwrap() error { return e.Err }
+
+// ExecutionError describes an instruction that could not be carried out. It
+// wraps the error classifying the failure, which is ErrExecutionFault for a
+// condition the Z-machine leaves undefined, ErrNotImplemented for an
+// instruction this build does not execute, and the underlying error - and so
+// ErrMemoryAccess or ErrInvalidText - for a refused memory access or a
+// malformed string reached while the instruction ran.
+type ExecutionError struct {
+	// PC is the byte address of the instruction, which is the program counter
+	// it was decoded from.
+	PC uint32
+	// Op identifies the instruction (S 4.3).
+	Op opcode
+	// Detail explains what went wrong.
+	Detail string
+	// Err is the error this one is classified as.
+	Err error
+}
+
+// Error implements error.
+func (e *ExecutionError) Error() string {
+	return fmt.Sprintf("zmachine: %s at pc 0x%04x: %s", e.Op, e.PC, e.Detail)
+}
+
+// Unwrap returns the error classifying this one.
+func (e *ExecutionError) Unwrap() error { return e.Err }
 
 // storyErrorf builds a StoryError classified as ErrInvalidStory.
 func storyErrorf(field string, value uint32, format string, args ...any) *StoryError {
