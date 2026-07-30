@@ -25,14 +25,10 @@ go get github.com/maloquacious/zmachine
 
 ### Requirements
 
-**Go 1.26.4 or later.** That the requirement is pinned to a patch release rather
-than to `1.26` is not this module's choice: `github.com/maloquacious/quetzal`
-declares `go 1.26.4`, and Go requires a module's `go` directive to be at least
-that of everything it depends on. A build on Go 1.26.3 will be refused, and
-`go mod tidy` restores the patch level if it is edited out.
+**Go 1.26 or later.**
 
 There are no other dependencies. Nothing outside the standard library and
-Quetzal is imported by the engine.
+[Quetzal](https://github.com/maloquacious/quetzal) is imported by the engine.
 
 ### Stability
 
