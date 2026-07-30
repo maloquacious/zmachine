@@ -1,5 +1,8 @@
 # zmachine
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/maloquacious/zmachine.svg)](https://pkg.go.dev/github.com/maloquacious/zmachine)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A small, embeddable Go package that implements a **headless Z-machine Version 3
 execution engine**.
 
@@ -19,6 +22,19 @@ The whole package is one invariant:
 ```sh
 go get github.com/maloquacious/zmachine
 ```
+
+## Documentation
+
+| Where | What |
+| --- | --- |
+| [pkg.go.dev](https://pkg.go.dev/github.com/maloquacious/zmachine) | Generated API documentation. Authoritative for signatures. |
+| [`docs/reference.md`](docs/reference.md) | The host-facing contract in one place: lifecycle calls, every option, every `Result` field, the error taxonomy, concurrency and limits. |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each release. |
+| [`specification.md`](specification.md) | Product and architecture specification. |
+| [`docs/prng-history.md`](docs/prng-history.md) | How the Frotz generator's golden digest was derived. |
+
+This README is the front door: what the package is, why it is shaped this way,
+and enough to get a first turn running.
 
 ## The request-oriented model
 
@@ -109,38 +125,32 @@ fmt.Print(result.Output) // the banner and the first room
 save(result.State)       // resume here when the player types
 ```
 
-`Result` carries everything the host needs and nothing it does not:
+`Result` carries the text the story printed, the upper window, the Version 3
+status line, the resumable state and the reason execution stopped. Every field
+is described in [`docs/reference.md`](docs/reference.md#result).
 
-| Field | What it is |
-| --- | --- |
-| `Output` | Text the story printed this turn, whitespace preserved exactly. |
-| `UpperWindow` | Text printed while the upper window was selected, kept separate because it overlays fixed screen positions rather than joining the narrative. |
-| `StatusLine` | The Version 3 status line — room name, score and turns, or the time. Drawn by the interpreter, so it is reported rather than printed. |
-| `State` | The resumable state. Present at every input boundary; `nil` when the story has halted, because there is nothing left to resume. |
-| `Status` | `WaitingForInput` or `Halted`. |
-
-### Options
+Options are passed to `New`:
 
 ```go
 machine, err := zmachine.New(story,
-	zmachine.WithLogger(logger),            // diagnostics; never story output
-	zmachine.WithRandomSeed(42),            // reproducible execution
+	zmachine.WithLogger(logger),              // diagnostics; never story output
+	zmachine.WithRandomSeed(42),              // reproducible execution
 	zmachine.WithInstructionLimit(1_000_000), // bound one call
-	zmachine.WithTracer(tracer),            // one event per instruction
+	zmachine.WithTracer(tracer),              // one event per instruction
 )
 ```
 
 A `Machine` with no options discards its diagnostics — it never falls back to
-`slog.Default` — and seeds itself unpredictably.
+`slog.Default` — seeds itself unpredictably, and bounds each call at ten million
+instructions. See [Options](docs/reference.md#options) for each one's default and
+what makes `New` reject it.
 
 There is one further option, `WithFrotzRandomSeed`, which makes the machine draw
 random numbers exactly as Frotz does. It exists so that this engine can be
 compared against `dfrotz` turn for turn on stories that use randomness, and it
 is not meant for running a real session: the Z-machine standard fixes only that
 a seeded generator be reproducible, not which numbers it yields, so two correct
-interpreters disagree from the first draw. It also inherits Frotz's own quirk
-that a seed below 1000 counts rather than generating, so a comparison should use
-a larger one. Ordinary use wants `WithRandomSeed`.
+interpreters disagree from the first draw. Ordinary use wants `WithRandomSeed`.
 
 ## Safety in a server
 
@@ -152,11 +162,11 @@ a request body.
   address and allocation size derived from a story or a save is checked before
   use. Malformed input is an error with context, not a crash. Panics are reserved
   for genuine internal invariant violations.
-- **Errors are classifiable.** Every error wraps one of `ErrInvalidStory`,
-  `ErrInvalidState`, `ErrInvalidOpcode`, `ErrMemoryAccess`, `ErrInvalidText`,
-  `ErrExecutionLimit` or `ErrExecutionFault`, so a host can tell a bad request
-  from a bug. Typed errors (`StoryError`, `MemoryError`, `DecodeError`,
-  `TextError`, `ExecutionError`) carry the program counter, opcode and address.
+- **Errors are classifiable.** Every error arising from a story, a save or
+  execution wraps one of seven sentinels, so a host can tell a bad request from a
+  bug, and typed errors carry the program counter, opcode and address. See
+  [Errors](docs/reference.md#errors) — including the two cases that deliberately
+  do *not* wrap a sentinel, one of which is context cancellation.
 - **Execution is bounded.** Every call to `Start` or `Run` has an instruction
   limit, and honours `context.Context` cancellation. A story that loops forever
   cannot hold a worker.
@@ -175,18 +185,11 @@ a request body.
 V3 is a complete, self-consistent target, and generalising for later versions
 would cost clarity in the parts that matter here.
 
-Some things belong to the host by design, not by omission:
-
-- **In-story `SAVE` and `RESTORE`** report failure (they do not branch), which is
-  a legal Version 3 outcome every story copes with. The host owns persistence,
-  and the engine has no filesystem to save to. The story prints its own "Failed."
-  message and play continues.
-- **Word wrapping** is not done. The host has no screen width, and inserting
-  newlines would corrupt the story's own whitespace.
-- **Output streams 2 and 4** (transcript and command script) are not provided;
-  they write to files. Streams 1 and 3 are implemented in full.
-- **Transport, users, storage, transactions, retries and idempotency** are the
-  embedding application's.
+Some things belong to the host by design, not by omission: in-story `SAVE` and
+`RESTORE`, word wrapping, output streams 2 and 4, and everything about
+transport, users, storage, transactions, retries and idempotency. What each of
+those does instead is in
+[Not implemented](docs/reference.md#not-implemented).
 
 ## Testing
 
@@ -229,7 +232,9 @@ ZMACHINE_REQUIRE_DFROTZ=1 go test ./...
 ```
 
 Worth doing before committing. See `testdata/frotz/README.md` for how the
-fixtures are made and regenerated.
+fixtures are made and regenerated, and
+[`docs/prng-history.md`](docs/prng-history.md) for how the random number
+generator is pinned to Frotz's.
 
 ## Story fixtures and licences
 
