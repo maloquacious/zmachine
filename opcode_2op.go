@@ -151,10 +151,72 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 		}
 		return controlContinue, m.store(inst, unsigned(signed(a)%signed(b)))
 
-	case opJin, opTestAttr, opSetAttr, opClearAttr, opInsertObj,
-		opGetProp, opGetPropAddr, opGetNextProp:
-		// The object model is not part of this build.
-		return m.notImplemented(inst)
+	case opJin:
+		// S 15, jin: jump if object a is a direct child of b, that is if the
+		// parent of a is b.
+		parent, err := m.mem.objectParent(a)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return m.branch(inst, parent == b)
+
+	case opTestAttr:
+		// S 15, test_attr: jump if the object has the attribute.
+		set, err := m.mem.objectAttribute(a, b)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return m.branch(inst, set)
+
+	case opSetAttr:
+		// S 15, set_attr: make the object have the attribute.
+		if err := m.mem.setObjectAttribute(a, b, true); err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, nil
+
+	case opClearAttr:
+		// S 15, clear_attr: make the object not have the attribute.
+		if err := m.mem.setObjectAttribute(a, b, false); err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, nil
+
+	case opInsertObj:
+		// S 15, insert_obj: move object a to become the first child of object
+		// b, taking its own children with it.
+		if err := m.mem.insertObject(a, b); err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, nil
+
+	case opGetProp:
+		// S 15, get_prop: read a property from an object, giving the default
+		// value if the object does not provide it (S 12.2).
+		value, err := m.mem.propertyValue(a, b)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, m.store(inst, value)
+
+	case opGetPropAddr:
+		// S 15, get_prop_addr: the byte address of the property data, or 0 if
+		// the object has not got the property.
+		addr, err := m.mem.propertyAddress(a, b)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, m.store(inst, addr)
+
+	case opGetNextProp:
+		// S 15, get_next_prop: the number of the next property the object
+		// provides, or the first one when asked for property 0, or 0 at the end
+		// of the list.
+		next, err := m.mem.nextPropertyNumber(a, b)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, m.store(inst, next)
 
 	default:
 		return controlContinue, m.fault(inst, ErrInvalidOpcode, "not dispatched")

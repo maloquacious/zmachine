@@ -1,9 +1,6 @@
 package zmachine
 
-import (
-	"errors"
-	"testing"
-)
+import "testing"
 
 // TestCallOpcode covers call (S 15), the only call instruction in Version 3.
 // It calls the routine with 0, 1, 2 or 3 arguments and stores the return
@@ -309,27 +306,4 @@ func TestInputStreamAndSoundEffectAreIgnored(t *testing.T) {
 	if len(m.out.screen) != 0 {
 		t.Errorf("output = %q, want none", string(m.out.screen))
 	}
-}
-
-// TestNotImplementedVAR checks that the variable-operand instructions this
-// build does not execute are accounted for in dispatch.
-func TestNotImplementedVAR(t *testing.T) {
-	t.Run("put_prop", func(t *testing.T) {
-		code := encodeVar(countVAR, 0x03, smallOp(1), smallOp(1), smallOp(1))
-		m := newTestMachine(t, code...)
-		err := stepErr(t, m)
-		assertExecutionError(t, err, machineCodeBase, ErrNotImplemented)
-		if errors.Is(err, ErrInvalidOpcode) {
-			t.Errorf("put_prop reported as an invalid opcode; it is legal Version 3")
-		}
-	})
-
-	// sread is reached only when the host has supplied a line of input;
-	// without one it is the suspension boundary of spec S 4 instead.
-	t.Run("sread with input", func(t *testing.T) {
-		code := encodeVar(countVAR, 0x04, largeOp(machineScratch), largeOp(machineScratch+64))
-		m := newTestMachine(t, code...)
-		m.input, m.hasInput = "look", true
-		assertExecutionError(t, stepErr(t, m), machineCodeBase, ErrNotImplemented)
-	})
 }

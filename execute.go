@@ -154,6 +154,15 @@ func (m *Machine) execute(inst *instruction) (control, error) {
 	// (S 4.2.2) and this instruction will be executed again, from the same
 	// program counter, when the host supplies a line.
 	if inst.op == opSRead && !m.hasInput {
+		// S 15, read: in Versions 1 to 3 the status line is redisplayed before
+		// the keyboard is read, and this boundary is where the keyboard would
+		// be waited on. Updating it here as well as when the instruction is
+		// re-executed hands the host the status line the player would be
+		// looking at while typing; the globals cannot change in between, so the
+		// two updates agree and S 8.2.4 still sees one update per read.
+		if err := m.updateStatusLine(); err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
 		return controlSuspend, nil
 	}
 
@@ -306,12 +315,4 @@ func (m *Machine) fail(inst *instruction, err error) *ExecutionError {
 		Detail: strings.TrimPrefix(err.Error(), "zmachine: "),
 		Err:    err,
 	}
-}
-
-// notImplemented reports an instruction this build does not execute. The
-// instruction is legal Version 3 and decoded correctly; the machinery it needs
-// is not present yet.
-func (m *Machine) notImplemented(inst *instruction) (control, error) {
-	return controlContinue, m.fault(inst, ErrNotImplemented,
-		"%s is not yet implemented in this build", inst.op.name())
 }

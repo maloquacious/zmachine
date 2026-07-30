@@ -226,31 +226,3 @@ func TestPrintAddrAndPrintPaddr(t *testing.T) {
 		}
 	})
 }
-
-// TestNotImplemented1OP checks that every one-operand instruction this build
-// does not execute is accounted for in dispatch.
-func TestNotImplemented1OP(t *testing.T) {
-	deferred := map[string]uint8{
-		"get_sibling":  0x01,
-		"get_child":    0x02,
-		"get_parent":   0x03,
-		"get_prop_len": 0x04,
-		"remove_obj":   0x09,
-		"print_obj":    0x0a,
-	}
-
-	for name, number := range deferred {
-		t.Run(name, func(t *testing.T) {
-			op := makeOpcode(count1OP, number)
-			code := encodeShort(number, smallOp(1))
-			if op.storesResult() {
-				code = append(code, globalFirst)
-			}
-			if op.branches() {
-				code = append(code, branch2(true, 20)...)
-			}
-			m := newTestMachine(t, code...)
-			assertExecutionError(t, stepErr(t, m), machineCodeBase, ErrNotImplemented)
-		})
-	}
-}

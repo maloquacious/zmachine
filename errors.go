@@ -40,11 +40,11 @@ var (
 	// engine, so these are ordinary errors and never panics.
 	ErrExecutionFault = errors.New("execution fault")
 
-	// ErrNotImplemented reports an instruction that this build of the engine
-	// does not yet execute. It is distinct from ErrInvalidOpcode: the
-	// instruction is legal Version 3 and decodes correctly, but the machinery
-	// it needs is not present.
-	ErrNotImplemented = errors.New("opcode not implemented")
+	// ErrNotImplemented reports a request this build of the engine cannot yet
+	// satisfy. Every Version 3 instruction is executed, so it no longer
+	// classifies any opcode; it remains the classification of Restore, which
+	// waits on the Quetzal state adapter.
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 // Region names one of the three regions of the Z-machine memory map
@@ -199,8 +199,7 @@ func (e *TextError) Unwrap() error { return e.Err }
 
 // ExecutionError describes an instruction that could not be carried out. It
 // wraps the error classifying the failure, which is ErrExecutionFault for a
-// condition the Z-machine leaves undefined, ErrNotImplemented for an
-// instruction this build does not execute, and the underlying error - and so
+// condition the Z-machine leaves undefined, and the underlying error - and so
 // ErrMemoryAccess or ErrInvalidText - for a refused memory access or a
 // malformed string reached while the instruction ran.
 type ExecutionError struct {

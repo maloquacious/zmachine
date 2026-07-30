@@ -1,0 +1,385 @@
+package zmachine
+
+import (
+	"errors"
+	"testing"
+)
+
+// propertyFixture builds one object carrying a spread of properties, listed in
+// the descending numerical order S 12.4 requires:
+//
+//	20  two bytes    18  four bytes    10  two bytes    3  one byte
+//
+// Property 15 is deliberately absent, so that reading it falls back to the
+// defaults table (S 12.2).
+func propertyFixture(t *testing.T) *objectFixture {
+	t.Helper()
+	return newObjectFixture(t).
+		defaults(map[uint8]uint16{15: 0xbeef, 20: 0x1111}).
+		object(1, testObject{
+			name: "thing",
+			properties: []testProperty{
+				{number: 20, data: []byte{0x12, 0x34}},
+				{number: 18, data: []byte{1, 2, 3, 4}},
+				{number: 10, data: []byte{0xab, 0xcd}},
+				{number: 3, data: []byte{0x7f}},
+			},
+		}).
+		object(2, testObject{name: "bare"})
+}
+
+// TestGetProperty covers get_prop (S 15): a property of one byte reads as that
+// byte and one of two bytes as a word, and an object that does not provide the
+// property reads the defaults table entry instead (S 12.2).
+func TestGetProperty(t *testing.T) {
+	m := propertyFixture(t).memory()
+
+	tests := []struct {
+		name     string
+		object   uint16
+		property uint16
+		want     uint16
+	}{
+		{name: "two-byte property", object: 1, property: 20, want: 0x1234},
+		{name: "one-byte property", object: 1, property: 3, want: 0x7f},
+		{name: "another two-byte property", object: 1, property: 10, want: 0xabcd},
+		{name: "absent property falls back to the default", object: 1, property: 15, want: 0xbeef},
+		{name: "the default is used even when the object provides nothing", object: 2, property: 20, want: 0x1111},
+		{name: "a default of zero", object: 2, property: 7, want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := m.propertyValue(tt.object, tt.property)
+			if err != nil {
+				t.Fatalf("propertyValue(%d, %d) error = %v", tt.object, tt.property, err)
+			}
+			if got != tt.want {
+				t.Errorf("propertyValue(%d, %d) = 0x%04x, want 0x%04x", tt.object, tt.property, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetPropertyErrors covers the two conditions S 15 leaves undefined for
+// get_prop: a property longer than two bytes, and a property number outside the
+// range the defaults table covers (S 12.2, S 12.4.1).
+func TestGetPropertyErrors(t *testing.T) {
+	m := propertyFixture(t).memory()
+
+	if _, err := m.propertyValue(1, 18); !errors.Is(err, ErrExecutionFault) {
+		t.Errorf("propertyValue of a 4-byte property: error = %v, want one wrapping ErrExecutionFault", err)
+	}
+	for _, property := range []uint16{0, propertyNumberMaxV3 + 1, 255} {
+		if _, err := m.propertyValue(1, property); !errors.Is(err, ErrExecutionFault) {
+			t.Errorf("propertyValue(1, %d) error = %v, want one wrapping ErrExecutionFault", property, err)
+		}
+	}
+}
+
+// TestGetPropertyAddress covers get_prop_addr (S 15): the byte address of the
+// property data, or 0 when "the object hasn't got the property".
+func TestGetPropertyAddress(t *testing.T) {
+	m := propertyFixture(t).memory()
+
+	// The property table begins at fixtureProperties with a text-length byte
+	// and the short name "thing", which is five Z-characters and so two words
+	// of text: the first size byte is therefore five bytes in, and the data of
+	// property 20 one byte after that.
+	name := encodeText(t, "thing")
+	wantFirst := uint16(fixtureProperties + 1 + len(name) + 1)
+
+	got, err := m.propertyAddress(1, 20)
+	if err != nil {
+		t.Fatalf("propertyAddress(1, 20) error = %v", err)
+	}
+	if got != wantFirst {
+		t.Errorf("propertyAddress(1, 20) = 0x%04x, want 0x%04x", got, wantFirst)
+	}
+
+	// Property 18 follows property 20's two data bytes and its own size byte.
+	if got, err = m.propertyAddress(1, 18); err != nil {
+		t.Fatalf("propertyAddress(1, 18) error = %v", err)
+	}
+	if want := wantFirst + 3; got != want {
+		t.Errorf("propertyAddress(1, 18) = 0x%04x, want 0x%04x", got, want)
+	}
+
+	for _, property := range []uint16{15, 31, 255} {
+		if got, err = m.propertyAddress(1, property); err != nil {
+			t.Fatalf("propertyAddress(1, %d) error = %v", property, err)
+		}
+		if got != 0 {
+			t.Errorf("propertyAddress(1, %d) = 0x%04x, want 0", property, got)
+		}
+	}
+}
+
+// TestGetPropertyLength covers get_prop_len (S 15), which is given the address
+// of a property's data and reads the size byte before it.
+func TestGetPropertyLength(t *testing.T) {
+	m := propertyFixture(t).memory()
+
+	for _, tt := range []struct {
+		property uint16
+		want     uint16
+	}{{property: 20, want: 2}, {property: 18, want: 4}, {property: 3, want: 1}} {
+		addr, err := m.propertyAddress(1, tt.property)
+		if err != nil {
+			t.Fatalf("propertyAddress(1, %d) error = %v", tt.property, err)
+		}
+		got, err := m.propertyLength(addr)
+		if err != nil {
+			t.Fatalf("propertyLength(0x%04x) error = %v", addr, err)
+		}
+		if got != tt.want {
+			t.Errorf("length of property %d = %d, want %d", tt.property, got, tt.want)
+		}
+	}
+
+	// S 15: "@get_prop_len 0 must return 0. This is required by some Infocom
+	// games and files generated by old versions of Inform." It is not an error
+	// and must not read the byte at address -1.
+	got, err := m.propertyLength(0)
+	if err != nil {
+		t.Fatalf("propertyLength(0) error = %v, want nil", err)
+	}
+	if got != 0 {
+		t.Errorf("propertyLength(0) = %d, want 0", got)
+	}
+}
+
+// TestGetNextProperty covers get_next_prop (S 15). Asked for property 0 it
+// gives the first property present; asked for the last one it gives 0; and
+// asked for a property the object does not provide it halts.
+func TestGetNextProperty(t *testing.T) {
+	m := propertyFixture(t).memory()
+
+	tests := []struct {
+		name     string
+		object   uint16
+		property uint16
+		want     uint16
+	}{
+		{name: "the first property", object: 1, property: 0, want: 20},
+		{name: "the next one down", object: 1, property: 20, want: 18},
+		{name: "and the next", object: 1, property: 18, want: 10},
+		{name: "the end of the list", object: 1, property: 3, want: 0},
+		{name: "an object with no properties", object: 2, property: 0, want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := m.nextPropertyNumber(tt.object, tt.property)
+			if err != nil {
+				t.Fatalf("nextPropertyNumber(%d, %d) error = %v", tt.object, tt.property, err)
+			}
+			if got != tt.want {
+				t.Errorf("nextPropertyNumber(%d, %d) = %d, want %d", tt.object, tt.property, got, tt.want)
+			}
+		})
+	}
+
+	// S 15: "It is illegal to try to find the next property of a property which
+	// does not exist, and an interpreter should halt with an error message (if
+	// it can efficiently check this condition)."
+	if _, err := m.nextPropertyNumber(1, 15); !errors.Is(err, ErrExecutionFault) {
+		t.Errorf("nextPropertyNumber(1, 15) error = %v, want one wrapping ErrExecutionFault", err)
+	}
+}
+
+// TestPropertyOrderIsAsStored checks that the walk follows the table as it is
+// laid out rather than assuming anything about the numbers. S 12.4 makes the
+// descending order essential, so a table in the wrong order is a story defect;
+// what matters here is that the traversal reports what is there and stays
+// bounded.
+func TestPropertyOrderIsAsStored(t *testing.T) {
+	m := newObjectFixture(t).
+		object(1, testObject{
+			name: "thing",
+			properties: []testProperty{
+				{number: 5, data: []byte{1}},
+				{number: 9, data: []byte{2}},
+			},
+		}).
+		memory()
+
+	first, err := m.nextPropertyNumber(1, 0)
+	if err != nil {
+		t.Fatalf("nextPropertyNumber(1, 0) error = %v", err)
+	}
+	if first != 5 {
+		t.Errorf("first property = %d, want 5", first)
+	}
+	next, err := m.nextPropertyNumber(1, 5)
+	if err != nil {
+		t.Fatalf("nextPropertyNumber(1, 5) error = %v", err)
+	}
+	if next != 9 {
+		t.Errorf("property after 5 = %d, want 9", next)
+	}
+}
+
+// TestPutProperty covers put_prop (S 15): a two-byte property takes the whole
+// word and a one-byte property "only the least significant byte of the value.
+// (For instance, storing -1 into a 1-byte property results in the property
+// value 255.)"
+func TestPutProperty(t *testing.T) {
+	m := propertyFixture(t).memory()
+
+	if err := m.putProperty(1, 20, 0xcafe); err != nil {
+		t.Fatalf("putProperty(1, 20, 0xcafe) error = %v", err)
+	}
+	if got, err := m.propertyValue(1, 20); err != nil || got != 0xcafe {
+		t.Errorf("propertyValue(1, 20) = 0x%04x, %v, want 0xcafe and nil", got, err)
+	}
+
+	if err := m.putProperty(1, 3, unsigned(-1)); err != nil {
+		t.Fatalf("putProperty(1, 3, -1) error = %v", err)
+	}
+	if got, err := m.propertyValue(1, 3); err != nil || got != 255 {
+		t.Errorf("propertyValue(1, 3) = %d, %v, want 255 and nil", got, err)
+	}
+}
+
+// TestPutPropertyErrors covers the two conditions S 15 makes put_prop halt on:
+// a property the object does not provide, and one longer than two bytes.
+func TestPutPropertyErrors(t *testing.T) {
+	m := propertyFixture(t).memory()
+
+	if err := m.putProperty(1, 15, 1); !errors.Is(err, ErrExecutionFault) {
+		t.Errorf("putProperty of an absent property: error = %v, want one wrapping ErrExecutionFault", err)
+	}
+	if err := m.putProperty(1, 18, 1); !errors.Is(err, ErrExecutionFault) {
+		t.Errorf("putProperty of a 4-byte property: error = %v, want one wrapping ErrExecutionFault", err)
+	}
+	// Neither refusal may have written anything.
+	if got, err := m.propertyAddress(1, 18); err == nil {
+		if data, err := m.readWord(uint32(got)); err != nil || data != 0x0102 {
+			t.Errorf("property 18 data = 0x%04x, want 0x0102 unchanged", data)
+		}
+	}
+}
+
+// TestPropertyTableIsBounded covers the traversal bound. S 12.4.1 numbers
+// properties 1 to 31 and S 12.4 lists them in descending order, so no
+// well-formed list holds more than 31 entries; a table whose terminating zero
+// byte has been lost must stop rather than walk over the rest of memory.
+func TestPropertyTableIsBounded(t *testing.T) {
+	f := newObjectFixture(t).object(1, testObject{name: "thing"})
+
+	// Overwrite the property table with a run of size bytes that never
+	// terminates: 0x21 is property 1 with one data byte.
+	filler := make([]byte, 512)
+	for i := range filler {
+		filler[i] = 0x21
+	}
+	// Keep the header - a one-word name - and replace everything after it.
+	f.at(fixtureProperties, 1, 0x94, 0xa5)
+	f.at(fixtureProperties+3, filler...)
+	m := f.memory()
+
+	if _, err := m.nextPropertyNumber(1, 0); err != nil {
+		t.Fatalf("nextPropertyNumber(1, 0) error = %v, want nil: the first property is present", err)
+	}
+	if _, err := m.propertyValue(1, 31); !errors.Is(err, ErrExecutionFault) {
+		t.Errorf("propertyValue over an unterminated table: error = %v, want one wrapping ErrExecutionFault", err)
+	}
+}
+
+// TestPropertySizeByteMultipleOf32 covers S 12.4.1: "It is otherwise illegal
+// for a size byte to be a multiple of 32", because the bottom five bits would
+// name property 0, which does not exist.
+func TestPropertySizeByteMultipleOf32(t *testing.T) {
+	m := newObjectFixture(t).
+		object(1, testObject{name: "thing"}).
+		// A one-word name, then a size byte of 0x40: two data bytes, property 0.
+		at(fixtureProperties, 1, 0x94, 0xa5, 0x40, 0x00, 0x00, 0x00).
+		memory()
+
+	if _, err := m.nextPropertyNumber(1, 0); !errors.Is(err, ErrExecutionFault) {
+		t.Errorf("error = %v, want one wrapping ErrExecutionFault", err)
+	}
+}
+
+// TestPropertyOpcodes covers get_prop, get_prop_addr, get_prop_len,
+// get_next_prop and put_prop as instructions, so that dispatch is exercised
+// along with the helpers (S 15).
+func TestPropertyOpcodes(t *testing.T) {
+	const (
+		numberGetProp     = 0x11
+		numberGetPropAddr = 0x12
+		numberGetNextProp = 0x13
+		numberGetPropLen  = 0x04
+		numberPutProp     = 0x03
+	)
+
+	t.Run("get_prop", func(t *testing.T) {
+		code := append(encodeVar(count2OP, numberGetProp, smallOp(1), smallOp(10)), globalFirst)
+		m := propertyFixture(t).code(code...).machine()
+		mustStep(t, m)
+		if got, err := m.readGlobal(globalFirst); err != nil || got != 0xabcd {
+			t.Errorf("get_prop = 0x%04x, %v, want 0xabcd and nil", got, err)
+		}
+	})
+
+	t.Run("get_prop_addr then get_prop_len", func(t *testing.T) {
+		code := join(
+			append(encodeVar(count2OP, numberGetPropAddr, smallOp(1), smallOp(18)), globalFirst),
+			append(encodeShort(numberGetPropLen, varOp(globalFirst)), globalFirst+1),
+		)
+		m := propertyFixture(t).code(code...).machine()
+		mustStep(t, m)
+		mustStep(t, m)
+		if got, err := m.readGlobal(globalFirst + 1); err != nil || got != 4 {
+			t.Errorf("get_prop_len = %d, %v, want 4 and nil", got, err)
+		}
+	})
+
+	t.Run("get_next_prop", func(t *testing.T) {
+		code := append(encodeVar(count2OP, numberGetNextProp, smallOp(1), smallOp(0)), globalFirst)
+		m := propertyFixture(t).code(code...).machine()
+		mustStep(t, m)
+		if got, err := m.readGlobal(globalFirst); err != nil || got != 20 {
+			t.Errorf("get_next_prop = %d, %v, want 20 and nil", got, err)
+		}
+	})
+
+	t.Run("put_prop", func(t *testing.T) {
+		code := encodeVar(countVAR, numberPutProp, smallOp(1), smallOp(10), largeOp(0x0f0f))
+		m := propertyFixture(t).code(code...).machine()
+		mustStep(t, m)
+		if got, err := m.mem.propertyValue(1, 10); err != nil || got != 0x0f0f {
+			t.Errorf("property 10 = 0x%04x, %v, want 0x0f0f and nil", got, err)
+		}
+	})
+}
+
+// TestZork1Properties checks the property model against a real Version 3
+// story. The expectations were read out of the story image by walking S 12
+// directly: object 180, the tan label, has its property table at $1d31, whose
+// list runs 18 (six bytes), 16 (two), 15 (two) and 8 (two) in descending order,
+// and the property defaults table at the head of the object table gives
+// property 15 the default 5.
+func TestZork1Properties(t *testing.T) {
+	m := newMemory(loadZork1(t))
+
+	if got, err := m.nextPropertyNumber(180, 0); err != nil || got != 18 {
+		t.Errorf("first property of object 180 = %d, %v, want 18 and nil", got, err)
+	}
+	if got, err := m.nextPropertyNumber(180, 16); err != nil || got != 15 {
+		t.Errorf("property after 16 = %d, %v, want 15 and nil", got, err)
+	}
+	if got, err := m.propertyValue(180, 15); err != nil || got != 2 {
+		t.Errorf("property 15 of object 180 = %d, %v, want 2 and nil", got, err)
+	}
+	// Object 181, the broken timber, provides properties 18, 16 and 15 only, so
+	// property 14 comes from the defaults table, whose entries are all zero
+	// except property 15.
+	if got, err := m.propertyValue(181, 14); err != nil || got != 0 {
+		t.Errorf("property 14 of object 181 = %d, %v, want 0 and nil", got, err)
+	}
+	if got, err := m.propertyValue(4, 15); err != nil || got != 5 {
+		t.Errorf("property 15 of object 4 = %d, %v, want the default 5 and nil", got, err)
+	}
+}

@@ -163,12 +163,20 @@ func (m *Machine) executeVAR(inst *instruction, ops []uint16) (control, error) {
 		return controlContinue, nil
 
 	case opPutProp:
-		// The object model is not part of this build.
-		return m.notImplemented(inst)
+		// S 15, put_prop: write a value to a property of an object. The
+		// property must exist and be one or two bytes long.
+		if err := m.operands(inst, 3, 3); err != nil {
+			return controlContinue, err
+		}
+		if err := m.mem.putProperty(ops[0], ops[1], ops[2]); err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, nil
 
 	case opSRead:
-		// Line input is not part of this build.
-		return m.notImplemented(inst)
+		// S 15, read: read one command from the player. The execution loop has
+		// already established that a line is available (spec S 4).
+		return m.executeSRead(inst, ops)
 
 	default:
 		return controlContinue, m.fault(inst, ErrInvalidOpcode, "not dispatched")

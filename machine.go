@@ -428,9 +428,6 @@ func (m *Machine) restart() error {
 
 // updateStatusLine recomputes the status line from the first three global
 // variables (S 8.2.2, S 8.2.3).
-//
-// The short name of the location object is not filled in yet: it needs the
-// object model, which this build does not have.
 func (m *Machine) updateStatusLine() error {
 	object, err := m.readGlobal(globalFirst)
 	if err != nil {
@@ -452,6 +449,20 @@ func (m *Machine) updateStatusLine() error {
 		// field the story may alter, so it is taken from the loaded story.
 		TimeGame: m.story.flags1&flags1TimeGame != 0,
 	}
+	// S 8.2.2: the short name of the object whose number is in the first global
+	// belongs on the left hand side of the line. S 8.2.2.1 requires the story
+	// to leave a valid object number there and asks that "interpreters could
+	// protect themselves in case the game accidentally violates this
+	// requirement", so a number that names no object leaves the name empty
+	// rather than ending the turn.
+	if name, err := m.mem.objectShortName(object); err != nil {
+		m.logger.Warn("status line object has no short name",
+			slog.Uint64("object", uint64(object)),
+			slog.String("error", err.Error()))
+	} else {
+		status.Name = name
+	}
+
 	if status.TimeGame {
 		// S 8.2.3.2: hours in the second global, minutes in the third.
 		status.Hours = uint8(second)

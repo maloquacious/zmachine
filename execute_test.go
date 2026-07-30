@@ -171,11 +171,17 @@ func TestInputBoundarySuspendsWithoutConsumingOperands(t *testing.T) {
 func TestOutputIsPerInvocation(t *testing.T) {
 	code := join(
 		encodeShort(0x02), encodeText(t, "first"),
-		encodeVar(countVAR, 0x04, largeOp(machineScratch), largeOp(machineScratch+64)),
+		encodeVar(countVAR, 0x04, largeOp(machineScratch), largeOp(machineScratch+0x20)),
 		encodeShort(0x02), encodeText(t, "second"),
 		encodeShort(0x0a),
 	)
-	m := newTestMachine(t, code...)
+	m := newStory(t).
+		code(code...).
+		// A text buffer of 20 bytes and a parse buffer with room for five
+		// words, both in the scratch area of dynamic memory (S 15, read).
+		at(machineScratch, 20).
+		at(machineScratch+0x20, 5).
+		machine()
 
 	first, err := m.Start(context.Background())
 	if err != nil {
@@ -185,15 +191,12 @@ func TestOutputIsPerInvocation(t *testing.T) {
 		t.Errorf("first Output = %q, want %q", first.Output, "first")
 	}
 
-	// The line-input instruction is not executed by this build, so supplying
-	// input reaches it and reports that rather than continuing. What matters
-	// here is that the earlier output does not come back.
 	second, err := m.Run(context.Background(), "look")
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("Run() error = %v, want one wrapping ErrNotImplemented", err)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
 	}
-	if second.Output != "" {
-		t.Errorf("second Output = %q, want empty on a fault", second.Output)
+	if second.Output != "second" {
+		t.Errorf("second Output = %q, want %q", second.Output, "second")
 	}
 }
 

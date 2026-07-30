@@ -1,9 +1,6 @@
 package zmachine
 
-import (
-	"errors"
-	"testing"
-)
+import "testing"
 
 // exec2OPStore runs a storing two-operand instruction with the given operands
 // and returns the value it wrote. The instruction is assembled in variable
@@ -353,40 +350,4 @@ func TestLoadWAndLoadB(t *testing.T) {
 		m := build(0x0f, 0xfffe, 0xffff)
 		assertExecutionError(t, stepErr(t, m), machineCodeBase, ErrMemoryAccess)
 	})
-}
-
-// TestNotImplemented2OP checks that every two-operand instruction this build
-// does not execute is accounted for in dispatch: each reports a contextual
-// error classified as ErrNotImplemented rather than being silently skipped or
-// mistaken for an invalid opcode.
-func TestNotImplemented2OP(t *testing.T) {
-	deferred := map[string]uint8{
-		"jin":           0x06,
-		"test_attr":     0x0a,
-		"set_attr":      0x0b,
-		"clear_attr":    0x0c,
-		"insert_obj":    0x0e,
-		"get_prop":      0x11,
-		"get_prop_addr": 0x12,
-		"get_next_prop": 0x13,
-	}
-
-	for name, number := range deferred {
-		t.Run(name, func(t *testing.T) {
-			op := makeOpcode(count2OP, number)
-			code := encodeVar(count2OP, number, smallOp(1), smallOp(1))
-			if op.storesResult() {
-				code = append(code, globalFirst)
-			}
-			if op.branches() {
-				code = append(code, branch2(true, 20)...)
-			}
-			m := newTestMachine(t, code...)
-			err := stepErr(t, m)
-			assertExecutionError(t, err, machineCodeBase, ErrNotImplemented)
-			if errors.Is(err, ErrInvalidOpcode) {
-				t.Errorf("%s reported as an invalid opcode; it is legal Version 3", name)
-			}
-		})
-	}
 }

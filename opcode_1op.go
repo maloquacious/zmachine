@@ -87,9 +87,70 @@ func (m *Machine) execute1OP(inst *instruction, ops []uint16) (control, error) {
 		// set to make room for call_1n.
 		return controlContinue, m.store(inst, ^a)
 
-	case opGetSibling, opGetChild, opGetParent, opGetPropLen, opRemoveObj, opPrintObj:
-		// The object model is not part of this build.
-		return m.notImplemented(inst)
+	case opGetSibling:
+		// S 15, get_sibling: store the next object in the tree, branching if it
+		// exists, that is if it is not 0. The result is stored whether or not
+		// the branch is taken.
+		sibling, err := m.mem.objectSibling(a)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		if err := m.store(inst, sibling); err != nil {
+			return controlContinue, err
+		}
+		return m.branch(inst, sibling != objectNothing)
+
+	case opGetChild:
+		// S 15, get_child: store the first object contained in the object,
+		// branching if it exists.
+		child, err := m.mem.objectChild(a)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		if err := m.store(inst, child); err != nil {
+			return controlContinue, err
+		}
+		return m.branch(inst, child != objectNothing)
+
+	case opGetParent:
+		// S 15, get_parent: store the parent object. S 15 notes that this "has
+		// no 'branch if exists' clause", unlike get_child and get_sibling.
+		parent, err := m.mem.objectParent(a)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, m.store(inst, parent)
+
+	case opGetPropLen:
+		// S 15, get_prop_len: the length in bytes of the property whose data
+		// begins at the given address.
+		length, err := m.mem.propertyLength(a)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, m.store(inst, length)
+
+	case opRemoveObj:
+		// S 15, remove_obj: detach the object from its parent. Its children
+		// remain in its possession.
+		if err := m.mem.removeObject(a); err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, nil
+
+	case opPrintObj:
+		// S 15, print_obj: print the short name of the object, which is the
+		// Z-encoded string in the header of its property table (S 12.4) and not
+		// a property. "If the object number is invalid, the interpreter should
+		// halt with a suitable error message."
+		name, err := m.mem.objectShortName(a)
+		if err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		if err := m.printText(name); err != nil {
+			return controlContinue, m.fail(inst, err)
+		}
+		return controlContinue, nil
 
 	default:
 		return controlContinue, m.fault(inst, ErrInvalidOpcode, "not dispatched")
