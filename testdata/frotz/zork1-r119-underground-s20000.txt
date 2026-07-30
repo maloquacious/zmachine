@@ -1,0 +1,201 @@
+ West of House                                                                                                                                                                                                                   Score: 0        Moves: 0
+
+ZORK I: The Great Underground Empire
+Infocom interactive fiction - a fantasy story
+Copyright (c) 1981, 1982, 1983, 1984, 1985, 1986 Infocom, Inc. All rights reserved.
+ZORK is a registered trademark of Infocom, Inc.
+Release 119 / Serial number 880429
+
+West of House
+You are standing in an open field west of a white house, with a boarded front door.
+There is a small mailbox here.
+
+> West of House                                                                                                                                                                                                                   Score: 0        Moves: 1
+
+Opening the small mailbox reveals a leaflet.
+
+> West of House                                                                                                                                                                                                                   Score: 0        Moves: 2
+
+Taken.
+
+> West of House                                                                                                                                                                                                                   Score: 0        Moves: 3
+
+"WELCOME TO ZORK!
+
+ZORK is a game of adventure, danger, and low cunning. In it you will explore some of the most amazing territory ever seen by mortals. No computer should be without one!"
+
+> West of House                                                                                                                                                                                                                   Score: 0        Moves: 4
+
+Dropped.
+
+> North of House                                                                                                                                                                                                                  Score: 0        Moves: 5
+
+North of House
+You are facing the north side of a white house. There is no door here, and all the windows are boarded up. To the north a narrow path winds through the trees.
+
+> Behind House                                                                                                                                                                                                                    Score: 0        Moves: 6
+
+Behind House
+You are behind the white house. A path leads into the forest to the east. In one corner of the house there is a small window which is slightly ajar.
+
+> Behind House                                                                                                                                                                                                                    Score: 0        Moves: 7
+
+With great effort, you open the window far enough to allow entry.
+
+> Kitchen                                                                                                                                                                                                                         Score: 10       Moves: 8
+
+Kitchen
+You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west and a dark staircase can be seen leading upward. A dark chimney leads down and to the east is a small window which
+is open.
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Living Room                                                                                                                                                                                                                     Score: 10       Moves: 9
+
+Living Room
+You are in the living room. There is a doorway to the east, a wooden door with strange gothic lettering to the west, which appears to be nailed shut, a trophy case, and a large oriental rug in the center of the room.
+Above the trophy case hangs an elvish sword of great antiquity.
+A battery-powered brass lantern is on the trophy case.
+
+> Living Room                                                                                                                                                                                                                     Score: 10       Moves: 10
+
+Taken.
+
+> Living Room                                                                                                                                                                                                                     Score: 10       Moves: 11
+
+Taken.
+
+> Living Room                                                                                                                                                                                                                     Score: 10       Moves: 12
+
+Opened.
+
+> Living Room                                                                                                                                                                                                                     Score: 10       Moves: 13
+
+With a great effort, the rug is moved to one side of the room, revealing the dusty cover of a closed trap door.
+
+> Living Room                                                                                                                                                                                                                     Score: 10       Moves: 14
+
+The door reluctantly opens to reveal a rickety staircase descending into darkness.
+
+> Kitchen                                                                                                                                                                                                                         Score: 10       Moves: 15
+
+Kitchen
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Kitchen                                                                                                                                                                                                                         Score: 10       Moves: 16
+
+The brass lantern is now on.
+
+> Attic                                                                                                                                                                                                                           Score: 10       Moves: 17
+
+Attic
+This is the attic. The only exit is a stairway leading down.
+A large coil of rope is lying in the corner.
+On a table is a nasty-looking knife.
+
+> Attic                                                                                                                                                                                                                           Score: 10       Moves: 18
+
+Taken.
+
+> Attic                                                                                                                                                                                                                           Score: 10       Moves: 19
+
+Taken.
+
+> Kitchen                                                                                                                                                                                                                         Score: 10       Moves: 20
+
+Kitchen
+A bottle is sitting on the table.
+The glass bottle contains:
+  A quantity of water
+On the table is an elongated brown sack, smelling of hot peppers.
+
+> Living Room                                                                                                                                                                                                                     Score: 10       Moves: 21
+
+Living Room
+
+> Cellar                                                                                                                                                                                                                          Score: 35       Moves: 22
+
+The trap door crashes shut, and you hear someone barring it.
+
+Cellar
+You are in a dark and damp cellar with a narrow passageway leading north, and a crawlway to the south. On the west is the bottom of a steep metal ramp which is unclimbable.
+Your sword is glowing with a faint blue glow.
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 23
+
+The Troll Room
+This is a small room with passages to the east and south and a forbidding hole leading west. Bloodstains and deep scratches (perhaps made by an axe) mar the walls.
+A nasty-looking troll, brandishing a bloody axe, blocks all passages out of the room.
+Your sword has begun to glow very brightly.
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 24
+
+The troll takes a fatal blow and slumps to the floor dead.
+Almost as soon as the troll breathes his last breath, a cloud of sinister black fog envelops him, and when the fog lifts, the carcass has disappeared.
+Your sword is no longer glowing.
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 25
+
+You can't see any troll here!
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 26
+
+You can't see any troll here!
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 27
+
+You can't see any troll here!
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 28
+
+You can't see any troll here!
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 29
+
+You can't see any troll here!
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 30
+
+The Troll Room
+This is a small room with passages to the east and south and a forbidding hole leading west. Bloodstains and deep scratches (perhaps made by an axe) mar the walls.
+There is a bloody axe here.
+
+> The Troll Room                                                                                                                                                                                                                  Score: 35       Moves: 31
+
+You are carrying:
+  A nasty knife
+  A rope
+  A sword
+  A brass lantern (providing light)
+
+>Your score is 35 (total of 350 points), in 31 moves.
+This gives you the rank of Amateur Adventurer.
+
+> East-West Passage                                                                                                                                                                                                               Score: 40       Moves: 32
+
+East-West Passage
+This is a narrow east-west passageway. There is a narrow stairway leading down at the north end of the room.
+
+> Round Room                                                                                                                                                                                                                      Score: 40       Moves: 33
+
+Round Room
+This is a circular stone room with passages in all directions. Several of them have unfortunately been blocked by cave-ins.
+
+> Round Room                                                                                                                                                                                                                      Score: 40       Moves: 34
+
+Round Room
+This is a circular stone room with passages in all directions. Several of them have unfortunately been blocked by cave-ins.
+
+> Round Room                                                                                                                                                                                                                      Score: 40       Moves: 35
+
+You are in perfect health.
+You can be killed by a serious wound.
+
+>Your score is 40 (total of 350 points), in 35 moves.
+This gives you the rank of Amateur Adventurer.
+Do you wish to leave the game? (Y is affirmative): >

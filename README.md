@@ -206,27 +206,30 @@ decoder, the Z-string decoder, the object tables and the state adapter.
 
 ### Differential tests against Frotz
 
-A separate set of tests compares this engine against `dfrotz`, which is a
-different and harder claim than agreeing with our own reading of the standard: a
-misreading held consistently throughout this package would satisfy every other
-test and fail these. They run in three layers — the transcript, the status line,
-and saved state, where dynamic memory is compared byte for byte and save files
-are passed in both directions.
+A separate set of tests compares this engine against Frotz, which is a different
+and harder claim than agreeing with our own reading of the standard: a misreading
+held consistently throughout this package would satisfy every other test and fail
+these. They run in three layers — the transcript, the status line, and the state
+of play, where the whole object tree and every attribute are compared against a
+save Frotz wrote.
 
-They are skipped when `dfrotz` is not installed. It is a tool the tests may use,
-never a dependency of the engine, and the package builds and tests without it.
+They run as part of an ordinary `go test ./...`, from fixtures committed under
+`testdata/frotz`. `dfrotz` is a tool used to make those fixtures, never a
+dependency of the engine or of its tests.
 
-A skip reads the same as a pass in the output, so a run that means to check
-against another interpreter should set `ZMACHINE_REQUIRE_DFROTZ`, which turns a
-missing `dfrotz` into a failure instead.
+Two questions a committed file cannot answer do need `dfrotz` installed, and are
+skipped without it: whether the fixtures still match the Frotz people have, and
+whether Frotz can take up a save this engine wrote. A skip reads the same as a
+pass, so a run that means to check either should set `ZMACHINE_REQUIRE_DFROTZ`,
+which turns a missing `dfrotz` into a failure.
 
 ```sh
 brew install frotz        # or your platform's package
-ZMACHINE_REQUIRE_DFROTZ=1 go test -run TestDifferential -v .
+ZMACHINE_REQUIRE_DFROTZ=1 go test ./...
 ```
 
-Worth running before committing, since these are the only tests that can catch a
-misreading of the standard held consistently across the whole package.
+Worth doing before committing. See `testdata/frotz/README.md` for how the
+fixtures are made and regenerated.
 
 ## Story fixtures and licences
 
