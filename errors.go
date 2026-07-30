@@ -210,8 +210,14 @@ type ExecutionError struct {
 	// PC is the byte address of the instruction, which is the program counter
 	// it was decoded from.
 	PC uint32
-	// Op identifies the instruction (S 4.3).
-	Op opcode
+	// Op identifies the instruction in the form used by S 14, for example
+	// "2OP:20 add".
+	//
+	// It is a string rather than an instruction identity because that is all a
+	// host can use it for: the field is diagnostic, and it holds the same form
+	// as TraceInstruction.Opcode so that a fault and a trace name an
+	// instruction the same way.
+	Op string
 	// Detail explains what went wrong.
 	Detail string
 	// Err is the error this one is classified as.
