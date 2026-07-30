@@ -7,7 +7,7 @@ package zmachine
 // see, so the two are maintained together: bumping the constant is a deliberate
 // edit, which is what TestVersion exists to enforce, and the commit that bumps
 // it is tagged to match.
-const version = "0.1.1"
+const version = "0.1.2"
 
 // Version returns the semantic version of this package.
 //
