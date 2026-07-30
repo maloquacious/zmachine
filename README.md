@@ -44,9 +44,10 @@ Pin a version and read [`CHANGELOG.md`](CHANGELOG.md) before upgrading.
 What `v1.0.0` will mean, when it arrives, is that the exported API stops moving
 without a major version. It does not exist yet.
 
-One thing that is *not* yet settled is how long a `Result.State` written by one
-version stays restorable by a later one. A host persisting saved state across
-upgrades should treat that as an open question until it is answered.
+Stored saved state is a separate promise and a stronger one: a `Result.State`
+stays restorable for as long as the story file does not change, whatever version
+of this package wrote it. See
+[Saved-state compatibility](docs/reference.md#saved-state-compatibility).
 
 ## Documentation
 
