@@ -11,8 +11,24 @@ the two are maintained together.
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-07-30
+
+Runnable examples, and the security policy. No exported behaviour changed.
+
 ### Added
 
+- `example_test.go`, four `Example` functions covering what a host actually
+  writes: load and `Start`; `Run` a command and read the output and the new
+  state; the create/restore/run/discard turn; and classifying an error, with
+  the context-cancellation case that wraps no engine sentinel and so has to be
+  tested for first. Until now every sample in the README and the reference was
+  prose, and nothing compiled it, so a rename left the first thing a new
+  consumer copies silently wrong. These are compiled and run by `go test` and
+  render on pkg.go.dev beside the symbols they document.
+- The examples run against a Version 3 story assembled in the test file rather
+  than one from `testdata/stories/`, which a checkout may not have. An example
+  carrying an `// Output:` comment cannot skip itself, and a test that skips
+  proves nothing.
 - `SECURITY.md`. The package claims that hostile story files and saved states
   cannot panic it, over-allocate, read out of bounds or outrun their limits;
   until now there was no answer to the obvious next question, which is what to do
