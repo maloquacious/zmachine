@@ -422,11 +422,18 @@ Each carries the context needed to diagnose the failure and is reachable with
 | `*MemoryError` | `Op MemoryOp`, `Width int`, `Addr uint32`, `Region Region`, `Detail string`, `Err error` |
 | `*DecodeError` | `Addr uint32`, `Opcode uint8`, `Detail string`, `Err error` |
 | `*TextError` | `Addr uint32`, `Detail string`, `Err error` |
-| `*ExecutionError` | `PC uint32`, `Op` (unexported type; printable), `Detail string`, `Err error` |
+| `*ExecutionError` | `PC uint32`, `Op string`, `Detail string`, `Err error` |
 
 `StoryError.Value` is meaningful only when `Field` is set. `DecodeError.Opcode`
 is zero when the failure was reading that byte itself. `TextError.Addr` is zero
 when the text did not come from story memory.
+
+`ExecutionError.Op` names the instruction in the form used by S 14, for example
+`"2OP:20 add"`. It is the same form as
+[`TraceInstruction.Opcode`](#traceinstruction), so a fault and a trace name an
+instruction identically. `DecodeError.Opcode` is a different thing: the raw
+first byte of an instruction the decoder could not make sense of, which is all
+there is to report when decoding is what failed.
 
 ### MemoryOp
 
@@ -464,7 +471,7 @@ case errors.Is(err, ErrInvalidState):
 default:
 	var fault *ExecutionError
 	if errors.As(err, &fault) {
-		// fault.PC and fault.Detail locate the instruction
+		// fault.PC, fault.Op and fault.Detail locate the instruction
 	}
 }
 ```

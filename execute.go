@@ -306,7 +306,7 @@ func (m *Machine) fault(inst *instruction, cause error, format string, args ...a
 	}
 	return &ExecutionError{
 		PC:     inst.addr,
-		Op:     inst.op,
+		Op:     inst.op.String(),
 		Detail: fmt.Sprintf(format, args...),
 		Err:    cause,
 	}
@@ -318,7 +318,7 @@ func (m *Machine) fault(inst *instruction, cause error, format string, args ...a
 func (m *Machine) fail(inst *instruction, err error) *ExecutionError {
 	return &ExecutionError{
 		PC:     inst.addr,
-		Op:     inst.op,
+		Op:     inst.op.String(),
 		Detail: strings.TrimPrefix(err.Error(), "zmachine: "),
 		Err:    err,
 	}

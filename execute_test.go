@@ -3,6 +3,7 @@ package zmachine
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -297,6 +298,56 @@ func TestTracer(t *testing.T) {
 			t.Errorf("global $10 with tracing = %d, without = %d", want, got)
 		}
 	})
+}
+
+// TestExecutionErrorOpNamesTheInstructionAsTheTracerDoes checks that
+// ExecutionError.Op holds the S 14 form of the instruction - "2OP:23 div" -
+// and that it is the same string the tracer reports for that instruction.
+//
+// The field is diagnostic and nothing else, which is why it is a string: a
+// host can log it, and a fault and a trace of the same opcode name it
+// identically. The story below divides by zero, which S 2.3.1 leaves
+// undefined, so the second div faults where the first succeeded.
+func TestExecutionErrorOpNamesTheInstructionAsTheTracerDoes(t *testing.T) {
+	const wantOp = "2OP:23 div"
+
+	// div 6 3 -> $10; div 6 0 -> $10.
+	code := join(
+		append(encodeVar(count2OP, 0x17, smallOp(6), smallOp(3)), globalFirst),
+		append(encodeVar(count2OP, 0x17, smallOp(6), smallOp(0)), globalFirst),
+	)
+
+	tracer := &recordingTracer{}
+	m := newStory(t).code(code...).machine(WithTracer(tracer))
+
+	_, err := m.Start(context.Background())
+	if !errors.Is(err, ErrExecutionFault) {
+		t.Fatalf("Start() error = %v, want one wrapping ErrExecutionFault", err)
+	}
+
+	var execErr *ExecutionError
+	if !errors.As(err, &execErr) {
+		t.Fatalf("error %v is not an *ExecutionError", err)
+	}
+	if execErr.Op != wantOp {
+		t.Errorf("ExecutionError.Op = %q, want %q", execErr.Op, wantOp)
+	}
+
+	// The faulting instruction is not traced, so the event recorded is the
+	// first div. That is the comparison worth making: the same opcode, named
+	// once by a fault and once by a trace.
+	if len(tracer.events) != 1 {
+		t.Fatalf("events = %d, want 1: the div that succeeded", len(tracer.events))
+	}
+	if tracer.events[0].Opcode != execErr.Op {
+		t.Errorf("tracer Opcode = %q, ExecutionError.Op = %q; the two should agree",
+			tracer.events[0].Opcode, execErr.Op)
+	}
+
+	// Op is a plain string, so it reaches the message without a String method.
+	if !strings.Contains(execErr.Error(), wantOp) {
+		t.Errorf("Error() = %q, want it to contain %q", execErr.Error(), wantOp)
+	}
 }
 
 // TestDecodeFailureStopsExecution checks that an instruction the decoder

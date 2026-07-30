@@ -11,6 +11,28 @@ the two are maintained together.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-30
+
+### Changed
+
+- **`ExecutionError.Op` is now a `string`, not the unexported `opcode` type.**
+  It holds the S 14 form of the instruction, for example `"2OP:20 add"` — what
+  the old type's `String` method produced, and what `TraceInstruction.Opcode`
+  already held. A fault and a trace now name an instruction identically, which
+  a new test asserts by faulting on the same opcode the tracer just recorded.
+
+  The field was exported but its type was not, so a host could print it and do
+  nothing else — not declare a variable of that type, take one as a parameter,
+  store one, or compare one against a named constant. It read as a field whose
+  type the documentation would not let you follow.
+
+  **This breaks code that assigned `ExecutionError.Op` to a variable or passed
+  it somewhere typed.** Code that only printed or formatted it is unaffected,
+  and that is everything the type allowed. Exporting `opcode` instead would
+  have dragged `operandCount` and the whole opcode constant table into the API
+  for a field that exists to be logged. Doing this at `v0.x` costs a minor
+  bump; after `v1.0.0` it would have been a much larger conversation.
+
 ## [0.1.7] — 2026-07-30
 
 Runnable examples, and the security policy. No exported behaviour changed.
