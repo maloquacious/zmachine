@@ -2,14 +2,23 @@
 
 Commercial story files, fetched on demand and never committed.
 
+**These exist to test this engine.** They are not a distribution channel, and
+nothing here supplies story files for running a real service. To use the
+commercial editions she owns, the client provides her own copies from the media
+she bought; this repository does not supply them and grants no right to them.
+
+**[obtaining-story-files.md](obtaining-story-files.md) has the steps** — both
+the fetch script and the route for supplying your own files — along with the
+rules on what must never happen to them.
+
 `testdata/stories/` holds Zork I, II and III as Microsoft released them under
 the MIT Licence. This directory holds a *different edition of the same three
 games*: the ones on *The Lost Treasures of Infocom*, which the client owns and
 which the embedding server may one day be asked to host.
 
-Those carry no redistribution licence. Only this file and `fetch.sh` are in git;
-the story files themselves are gitignored, exactly as `references/` treats the
-specifications it fetches.
+Those carry no redistribution licence. Only this file, `fetch.sh` and
+`obtaining-story-files.md` are in git; the story files themselves are
+gitignored, exactly as `references/` treats the specifications it fetches.
 
 ## Fetching them
 

@@ -26,3 +26,4 @@
 /testdata/local/*
 !/testdata/local/README.md
 !/testdata/local/fetch.sh
+!/testdata/local/obtaining-story-files.md
