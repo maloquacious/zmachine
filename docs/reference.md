@@ -22,6 +22,7 @@ Section numbers written `S 6.1` refer to the
 - [Options](#options)
 - [Executing](#executing)
 - [Result](#result)
+- [Saved-state compatibility](#saved-state-compatibility)
 - [StatusLine](#statusline)
 - [Status](#status)
 - [Errors](#errors)
@@ -221,6 +222,126 @@ Returned by `Start` and `Run`.
 
 Passing `State` to `Restore` on a machine built from the same `Story` returns
 execution to the point the call stopped at. The bytes are opaque to the host.
+
+---
+
+## Saved-state compatibility
+
+What a host may rely on when it stores `Result.State` and hands it back later.
+
+### What the bytes are
+
+A complete, self-contained snapshot in the Quetzal format. Not a delta against a
+previous save, and not a member of a chain.
+
+| Chunk | Holds |
+| --- | --- |
+| `IFhd` | Story identity: release number, serial code, checksum. |
+| `CMem` | Dynamic memory, as a difference against the story file. |
+| `Stks` | The call chain and the evaluation stack. |
+| `ZRnd` | Random generator state. This engine's own chunk. |
+| `ZScr` | Logical screen state (S 8.6). This engine's own chunk. |
+
+`CMem` is a difference against the **pristine story file**, not against an
+earlier save: dynamic memory is XORed against the story's own and the zero runs
+are compressed. The restoring machine already holds the story, so one blob
+reconstructs the whole state by itself.
+
+Consequently every state is independent. A host may keep only the most recent,
+in any order, with no base state and nothing to replay.
+
+Sizes observed for Zork I, whose story image is 86,838 bytes: 356 bytes at the
+opening prompt, 496 bytes six turns in. `CMem` grows as the story diverges from
+its starting state rather than with the number of turns; the other chunks are
+effectively fixed.
+
+### The guarantee
+
+**A state restores as long as the story file is byte-identical.** The version of
+this package that wrote a state is not part of the contract. A host does not need
+to record which engine build produced a state, and does not need to migrate
+stored states before upgrading.
+
+**A state does not cross story files.** `IFhd` binds it to one release, serial
+and checksum, and `Restore` refuses a state whose identity does not match the
+story the machine was built from. Two editions of one game are two story files:
+a state from Zork I release 119 is not valid for release 88, and is refused
+rather than misread.
+
+### Identifying the story file
+
+A host that stores state must be able to hand back the same story file. The
+identity `IFhd` records — release, serial, checksum — is weak for that purpose:
+the checksum is a sum modulo 65536, and early Version 3 stories carry none at
+all, so `Story.Checksum()` returns 0 for them.
+
+A SHA-256 over the story image is the stronger key, and the host already holds
+those bytes before calling `LoadStory`. The two are complementary: the hash is
+the host's key for which file a session belongs to, and `IFhd` remains this
+engine's own check.
+
+### If the format changes
+
+If a future release changes the state such that an existing state cannot be read
+as it stands, this package will provide an **upgrade adapter** converting the
+older form to the newer.
+
+The conversion is **forward only**. Older states are brought up to the current
+format; no adapter converts a newer state back to an older one. A host may
+upgrade this package without migrating stored state first, and must not expect
+to downgrade afterwards.
+
+This promise is made within Version 3 of the Z-machine and Quetzal 1.4. A story
+requiring a different version of either — including an *earlier* Z-machine
+version, as the first editions of Zork I and Zork II do — is outside this
+engine's scope and is refused by `LoadStory` rather than read incorrectly.
+Widening that scope would not invalidate state already stored for Version 3
+stories.
+
+`IFhd`, `CMem` and `Stks` belong to
+[`github.com/maloquacious/quetzal`](https://github.com/maloquacious/quetzal),
+which is released separately. Honouring this promise across a change to that
+format depends on that package continuing to read what it previously wrote.
+
+### When a state is refused
+
+`Restore` either succeeds or leaves the machine exactly as it was, so a failure
+may be reported and a different state tried.
+
+The two engine-private chunks are not treated alike, and the difference decides
+whether a fault is recoverable.
+
+| Condition | `ZScr` | `ZRnd` |
+| --- | --- | --- |
+| Chunk absent | Screen returns to its initial state | Generator reseeds |
+| Version byte not recognised | Screen returns to its initial state | Generator reseeds |
+| Payload malformed | Screen returns to its initial state | `ErrInvalidState` |
+| Payload over 256 bytes | — | `ErrInvalidState` |
+
+A state written by another interpreter carries neither chunk and restores
+normally, with its program counter moved to this engine's input boundary.
+
+Where a chunk is dropped rather than refused, the restore succeeds and execution
+continues, but something is lost: a dropped `ZRnd` means the story's sequence of
+random numbers no longer continues where it left off. See
+[Random numbers across a format change](#random-numbers-across-a-format-change).
+
+### Random numbers across a format change
+
+`ZRnd` carries the generator state, and a state whose `ZRnd` cannot be read
+restores with the generator reseeded instead. Nothing errors and no output is
+lost, but the story's random sequence diverges from the one it was in the middle
+of. Section 2.4 requires only that a seeded generator be reproducible, so a
+reseeded machine remains conforming; it is simply not the same run.
+
+A host relying on reproducibility — replaying a session from a seed, or
+comparing a run against a recorded transcript — should treat a change in
+`ZRnd`'s format as breaking that reproducibility even though every `Restore`
+succeeds.
+
+The upgrade adapter above exists so that this stays a fallback rather than the
+plan: a change to `ZRnd`'s format should migrate the chunk and preserve the
+sequence, and reseeding is what happens only when no migration is possible.
 
 ---
 

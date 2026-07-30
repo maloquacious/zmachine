@@ -11,6 +11,16 @@ the two are maintained together.
 
 ## [Unreleased]
 
+### Added
+
+- A saved-state compatibility policy in `docs/reference.md`, with a summary in
+  the README where persistence is first mentioned. It states what the state
+  bytes are, that a state restores for as long as the story file is unchanged
+  and that the engine version is not part of that contract, that a story file is
+  better identified by a hash than by the release and serial Quetzal records,
+  which restore failures are recoverable and which are not, and a forward-only
+  upgrade adapter promise should the format ever change.
+
 ## [0.1.4] — 2026-07-30
 
 ### Added
