@@ -202,6 +202,14 @@ func TestZork1AcrossRequestBoundaries(t *testing.T) {
 // story output, the upper window and the status line - without any expectation
 // that could drift out of date. Both runs use the same seed, so the random
 // sequence is part of what must agree (S 2.4).
+//
+// The state handed back at each boundary is compared as well, and that is the
+// stronger half. Two lifecycles can print the same thing while carrying
+// different state, and the difference would surface only on some later turn
+// that happens to consult it - or in a save a host wrote and restored a week
+// afterwards. Comparing the snapshots closes that gap at the boundary where it
+// opens, and they agree exactly: identical bytes, every turn, including the
+// opening.
 func TestRequestBoundariesMatchContinuousExecution(t *testing.T) {
 	story := loadZork1(t)
 	commands := make([]string, 0, len(zork1Script))
@@ -266,7 +274,46 @@ func TestRequestBoundariesMatchContinuousExecution(t *testing.T) {
 			t.Errorf("%s: status = %v continuous, %v per-request",
 				what, continuous[i].Status, perRequest[i].Status)
 		}
+		if !bytes.Equal(continuous[i].State, perRequest[i].State) {
+			t.Errorf("%s: the state handed back differs\n%s", what,
+				stateDifferences(t, story, continuous[i].State, perRequest[i].State))
+		}
 	}
+}
+
+// stateDifferences describes every way two snapshots this engine produced
+// differ, for a failure message.
+//
+// bytes.Equal decides whether two snapshots agree; this only explains a
+// disagreement, and is called only once one has been found. The comparison is
+// given no options: both files were written by this engine from the same story,
+// so there is no interpreter difference to forgive and everything it reports is
+// a real one.
+func stateDifferences(t *testing.T, story *Story, a, b []byte) string {
+	t.Helper()
+
+	qs, err := quetzal.ParseStory(story.image)
+	if err != nil {
+		t.Fatalf("describing the story to the Quetzal package: %v", err)
+	}
+	read := func(state []byte, whose string) *quetzal.Save {
+		save, err := quetzal.Read(bytes.NewReader(state), qs)
+		if err != nil {
+			t.Fatalf("reading the %s snapshot: %v", whose, err)
+		}
+		return save
+	}
+
+	diffs := quetzal.Compare(read(a, "continuous"), read(b, "per-request"))
+	if len(diffs) == 0 {
+		return "  the bytes differ but Quetzal records the same state in both"
+	}
+
+	lines := make([]string, 0, len(diffs))
+	for _, d := range diffs {
+		lines = append(lines, "  "+d.String())
+	}
+	return strings.Join(lines, "\n")
 }
 
 // TestRestoredMachinesAreIsolated checks that two players of the same story,

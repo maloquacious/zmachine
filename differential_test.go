@@ -33,8 +33,9 @@ import (
 //	   all at once but only proves the two agree about what to print;
 //	2. the status line, which is drawn from globals rather than printed by the
 //	   story, so it catches variable drift a transcript can hide;
-//	3. saved state, where dynamic memory is compared byte for byte after the
-//	   same commands, so it catches divergence that never reached the screen.
+//	3. saved state, where the position both interpreters reached after the same
+//	   commands is compared object by object and global by global, so it catches
+//	   divergence that never reached the screen.
 //
 // The tests that need dfrotz itself live in differential_live_test.go, because
 // neither of the questions they ask can be answered by a file sitting in the
@@ -224,6 +225,16 @@ func TestDifferentialGameState(t *testing.T) {
 
 			compareObjectTrees(t, ours.machine, theirs)
 			compareGlobals(t, ours.machine, theirs)
+
+			// A failure above names one object or one global. The Quetzal
+			// comparison says where in the save the disagreement lives, which
+			// is the difference between knowing that something drifted and
+			// knowing what did. It is logged only after a failure, because
+			// against a Frotz save it always has something to report.
+			if t.Failed() {
+				t.Logf("this engine's snapshot against the Frotz save:\n%s",
+					saveDifferences(t, ours.machine, ours.states[len(ours.states)-1], fixture.file))
+			}
 
 			// Holding the same state should also mean behaving the same way.
 			compareNextTurn(t, ours.machine, theirs, "look")
@@ -430,56 +441,47 @@ func readFrotzSave(t *testing.T, m *Machine, file string) *quetzal.Save {
 	return save
 }
 
-// volatileHeaderBytes are the header addresses two interpreters may legitimately
-// differ on, and which are therefore excluded when dynamic memory is compared.
+// saveDifferences describes, in the Quetzal package's own terms, every way in
+// which a snapshot this engine produced differs from a save Frotz wrote.
 //
-// Everything here is written by the interpreter to describe itself or its
-// screen rather than by the story to record the state of play (S 11.1): the
-// flags it sets to advertise what it can do, the interpreter number and
-// version, the screen it happens to have, and the standard it claims to meet.
-// A difference in any of them says the two interpreters are different programs,
-// which is already known.
-var volatileHeaderBytes = map[uint32]string{
-	0x01: "Flags 1: interpreter capabilities",
-	0x10: "Flags 2, high byte",
-	0x11: "Flags 2, low byte",
-	0x1e: "interpreter number",
-	0x1f: "interpreter version",
-	0x20: "screen height",
-	0x21: "screen width",
-	0x32: "standard revision, high byte",
-	0x33: "standard revision, low byte",
-}
-
-// compareDynamicMemory reports every address at which two images of dynamic
-// memory differ, ignoring the header bytes an interpreter owns.
-func compareDynamicMemory(t *testing.T, ours, theirs []byte) {
+// It is diagnostic and asserts nothing. Differences are expected here and are
+// not a failure: the two files are written at different instants inside the
+// turn that saved, which is what TestDifferentialGameState explains and why
+// that test compares the state of play rather than these bytes. What this is
+// for is the moment after such a comparison has already failed, when knowing
+// that one object moved is less useful than knowing which address, which frame
+// or which local carries the disagreement.
+//
+// Every option given disregards a difference between two interpreters rather
+// than between two positions: the header fields an interpreter fills in to
+// describe itself (S 11.1), whether dynamic memory happened to be stored
+// compressed, and the chunks this engine adds for state Quetzal does not model.
+func saveDifferences(t *testing.T, m *Machine, snapshot []byte, file string) string {
 	t.Helper()
 
-	if len(ours) != len(theirs) {
-		t.Fatalf("dynamic memory is %d bytes here and %d bytes in the Frotz save", len(ours), len(theirs))
+	story, err := m.quetzalStory()
+	if err != nil {
+		t.Fatalf("describing the story to the Quetzal package: %v", err)
+	}
+	ours, err := quetzal.Read(bytes.NewReader(snapshot), story)
+	if err != nil {
+		t.Fatalf("reading this engine's own snapshot: %v", err)
 	}
 
-	var differences []string
-	for i := range ours {
-		if ours[i] == theirs[i] {
-			continue
-		}
-		addr := uint32(i)
-		if _, volatile := volatileHeaderBytes[addr]; volatile {
-			continue
-		}
-		if len(differences) < 16 {
-			differences = append(differences,
-				"0x"+strconv.FormatUint(uint64(addr), 16)+
-					": ours 0x"+strconv.FormatUint(uint64(ours[i]), 16)+
-					", Frotz 0x"+strconv.FormatUint(uint64(theirs[i]), 16))
-		}
+	diffs := quetzal.Compare(ours, readFrotzSave(t, m, file),
+		quetzal.IgnoreInterpreterHeader(),
+		quetzal.IgnoreMemoryEncoding(),
+		quetzal.IgnoreChunks(chunkID(idRandom), chunkID(idScreen)),
+	)
+	if len(diffs) == 0 {
+		return "  the two saves agree in everything Quetzal records"
 	}
-	if len(differences) > 0 {
-		t.Errorf("dynamic memory differs from the Frotz save at %d addresses:\n  %s",
-			len(differences), strings.Join(differences, "\n  "))
+
+	lines := make([]string, 0, len(diffs))
+	for _, d := range diffs {
+		lines = append(lines, "  "+d.String())
 	}
+	return strings.Join(lines, "\n")
 }
 
 // statusLinePattern matches the status line Frotz draws for a score-and-moves
