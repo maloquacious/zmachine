@@ -154,6 +154,11 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 	case opJin:
 		// S 15, jin: jump if object a is a direct child of b, that is if the
 		// parent of a is b.
+		if m.nothingObject(inst, a) {
+			// "Nothing" is contained in nothing, so the branch is taken only
+			// when the story asked whether it is in nothing.
+			return m.branch(inst, b == objectNothing)
+		}
 		parent, err := m.mem.objectParent(a)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
@@ -162,6 +167,10 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 
 	case opTestAttr:
 		// S 15, test_attr: jump if the object has the attribute.
+		if m.nothingObject(inst, a) {
+			// "Nothing" has no attributes, so the branch is not taken.
+			return m.branch(inst, false)
+		}
 		set, err := m.mem.objectAttribute(a, b)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
@@ -170,6 +179,9 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 
 	case opSetAttr:
 		// S 15, set_attr: make the object have the attribute.
+		if m.nothingObject(inst, a) {
+			return controlContinue, nil
+		}
 		if err := m.mem.setObjectAttribute(a, b, true); err != nil {
 			return controlContinue, m.fail(inst, err)
 		}
@@ -177,6 +189,9 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 
 	case opClearAttr:
 		// S 15, clear_attr: make the object not have the attribute.
+		if m.nothingObject(inst, a) {
+			return controlContinue, nil
+		}
 		if err := m.mem.setObjectAttribute(a, b, false); err != nil {
 			return controlContinue, m.fail(inst, err)
 		}
@@ -185,6 +200,11 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 	case opInsertObj:
 		// S 15, insert_obj: move object a to become the first child of object
 		// b, taking its own children with it.
+		if m.nothingObject(inst, a) || m.nothingObject(inst, b) {
+			// Moving nothing, or moving something into nothing, changes no
+			// object in the tree.
+			return controlContinue, nil
+		}
 		if err := m.mem.insertObject(a, b); err != nil {
 			return controlContinue, m.fail(inst, err)
 		}
@@ -193,6 +213,11 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 	case opGetProp:
 		// S 15, get_prop: read a property from an object, giving the default
 		// value if the object does not provide it (S 12.2).
+		if m.nothingObject(inst, a) {
+			// "Nothing" has no property table, so not even the default of
+			// S 12.2 applies and the result is 0.
+			return controlContinue, m.store(inst, 0)
+		}
 		value, err := m.mem.propertyValue(a, b)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
@@ -202,6 +227,9 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 	case opGetPropAddr:
 		// S 15, get_prop_addr: the byte address of the property data, or 0 if
 		// the object has not got the property.
+		if m.nothingObject(inst, a) {
+			return controlContinue, m.store(inst, 0)
+		}
 		addr, err := m.mem.propertyAddress(a, b)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
@@ -212,6 +240,9 @@ func (m *Machine) execute2OP(inst *instruction, ops []uint16) (control, error) {
 		// S 15, get_next_prop: the number of the next property the object
 		// provides, or the first one when asked for property 0, or 0 at the end
 		// of the list.
+		if m.nothingObject(inst, a) {
+			return controlContinue, m.store(inst, 0)
+		}
 		next, err := m.mem.nextPropertyNumber(a, b)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)

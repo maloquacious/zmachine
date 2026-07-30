@@ -69,14 +69,6 @@ func (m *Machine) Run(ctx context.Context, input string) (Result, error) {
 	return m.run(ctx)
 }
 
-// Restore replaces the machine's state with a previously saved one.
-//
-// It is not available in this build: the Quetzal state adapter is not yet
-// present, so the only way to reach a given point in a story is to execute it.
-func (m *Machine) Restore(data []byte) error {
-	return fmt.Errorf("zmachine: Restore: saved state is not supported by this build: %w", ErrNotImplemented)
-}
-
 // run is the execution loop shared by Start and Run.
 func (m *Machine) run(ctx context.Context) (Result, error) {
 	m.out.beginInvocation()
@@ -124,26 +116,41 @@ func (m *Machine) run(ctx context.Context) (Result, error) {
 		case controlHalt:
 			m.halted = true
 			m.logger.Debug("story halted", slog.Uint64("pc", uint64(pc)))
-			return m.result(Halted), nil
+			return m.result(Halted)
 		case controlSuspend:
 			// The program counter is left at the input instruction so that the
 			// next call re-executes it with the input the host supplies.
 			m.pc = pc
 			m.logger.Debug("input boundary reached", slog.Uint64("pc", uint64(pc)))
-			return m.result(WaitingForInput), nil
+			return m.result(WaitingForInput)
 		}
 	}
 }
 
 // result builds the Result for an invocation that stopped with the given
 // status.
-func (m *Machine) result(status Status) Result {
-	return Result{
+//
+// An invocation that stopped at an input boundary carries a snapshot of the
+// state execution resumes from (spec S 23). A halted one does not: the story
+// ended itself with quit and there is nothing to resume, so State is nil and a
+// host holding the previous turn's state still has the last resumable point.
+func (m *Machine) result(status Status) (Result, error) {
+	result := Result{
 		Output:      string(m.out.screen),
 		UpperWindow: string(m.out.upper),
 		StatusLine:  m.status,
 		Status:      status,
 	}
+	if status == Halted {
+		return result, nil
+	}
+
+	state, err := m.snapshot()
+	if err != nil {
+		return Result{}, err
+	}
+	result.State = state
+	return result, nil
 }
 
 // execute evaluates an instruction's operands and carries it out.

@@ -168,6 +168,10 @@ func (m *Machine) executeVAR(inst *instruction, ops []uint16) (control, error) {
 		if err := m.operands(inst, 3, 3); err != nil {
 			return controlContinue, err
 		}
+		if m.nothingObject(inst, ops[0]) {
+			// "Nothing" has no properties to write to.
+			return controlContinue, nil
+		}
 		if err := m.mem.putProperty(ops[0], ops[1], ops[2]); err != nil {
 			return controlContinue, m.fail(inst, err)
 		}

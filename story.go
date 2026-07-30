@@ -1,11 +1,61 @@
 // Package zmachine implements a headless Z-machine Version 3 execution engine.
 //
+// It is built for a host that advances a story one command at a time: given a
+// validated story, an optional saved state and at most one line of input, it
+// executes until the next input boundary, clean termination, cancellation, a
+// limit or a fault, then returns the captured output and a resumable state. It
+// never blocks for input, never prints, and touches nothing outside the process
+// - no filesystem, no terminal, no environment, no process-global state.
+//
+// # Types
+//
 // A Story holds validated, immutable story data and is safe for concurrent use.
 // Each Machine built from a Story owns its own mutable execution state, so many
-// independent sessions may share one loaded story.
+// independent sessions may share one loaded story. A Machine is not safe for
+// concurrent use, and is not meant to be kept: creating one is cheap.
+//
+// # The request lifecycle
+//
+// Loading a story is the expensive step and is done once. Everything after that
+// is per request:
+//
+//	machine, err := zmachine.New(story)
+//	if err != nil {
+//		return err
+//	}
+//	if len(saved) != 0 {
+//		if err := machine.Restore(saved); err != nil {
+//			return err
+//		}
+//	}
+//	result, err := machine.Run(ctx, command)
+//	if err != nil {
+//		return err
+//	}
+//	store(result.State)
+//	send(result.Output)
+//
+// A story that has not begun is started with Start rather than Run, since a new
+// game usually prints its banner before asking for anything. Either call
+// returns a Result whose State resumes execution exactly where it stopped, so
+// the Machine may be dropped as soon as the Result is in hand. Doing that on
+// every turn is observably the same as keeping one Machine alive throughout.
+//
+// # Untrusted input
+//
+// Stories and saved states are both treated as hostile binary input. Every
+// address, length and count derived from either is checked before it is used to
+// index, allocate or slice, and malformed input is reported as an error - never
+// a panic. Errors wrap a sentinel (ErrInvalidStory, ErrInvalidState,
+// ErrExecutionFault and the rest) so a host can classify a failure with
+// errors.Is, and carry the program counter, opcode and address in a typed error
+// so it can be diagnosed.
+//
+// # Version 3 only
 //
 // The Z-machine semantics implemented here follow the Z-Machine Standards
-// Document 1.1; section references in comments refer to that document.
+// Document 1.1; section references in comments refer to that document. Only
+// Version 3 is implemented, and LoadStory rejects every other version.
 package zmachine
 
 import (

@@ -39,12 +39,6 @@ var (
 	// execution environment (S 5.5), and so on. The story is at fault, not the
 	// engine, so these are ordinary errors and never panics.
 	ErrExecutionFault = errors.New("execution fault")
-
-	// ErrNotImplemented reports a request this build of the engine cannot yet
-	// satisfy. Every Version 3 instruction is executed, so it no longer
-	// classifies any opcode; it remains the classification of Restore, which
-	// waits on the Quetzal state adapter.
-	ErrNotImplemented = errors.New("not implemented")
 )
 
 // Region names one of the three regions of the Z-machine memory map

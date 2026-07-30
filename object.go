@@ -1,6 +1,9 @@
 package zmachine
 
-import "fmt"
+import (
+	"fmt"
+	"log/slog"
+)
 
 // The Version 3 object table (S 12).
 //
@@ -55,6 +58,35 @@ const (
 	// any one chain (S 12.5), so a longer walk means the chain has a cycle.
 	objectChainLimit = maxObjectsV3
 )
+
+// nothingObject reports whether an object opcode was applied to object 0, and
+// records it as a defect in the story if it was.
+//
+// S 12.3 gives object 0 the meaning "nothing" and says "there is formally no
+// such object", so every accessor below refuses it. What an interpreter should
+// do when a story asks anyway is settled by Appendix A: "A number of
+// post-Infocom games have been released which contain errors, most often trying
+// to perform illegal operations on object 0. Many interpreters silently ignored
+// these errors." It recommends four selectable levels of error checking, of
+// which only the strictest is "Fatal error and close the interpreter", and warns
+// that reporting a bug at all "can also ruin gameplay".
+//
+// A session running inside a server takes the level that keeps the session
+// playable. The operation produces the null result - nothing done, 0 stored,
+// no branch taken - which is what the tolerant interpreters do, and the
+// diagnostic goes to the host's logger, where the host can see it without the
+// player's turn being lost to a bug in the story. Object numbers above the
+// Version 3 maximum remain faults: those are not "nothing", they are a story
+// that has lost track of its own object table.
+func (m *Machine) nothingObject(inst *instruction, number uint16) bool {
+	if number != objectNothing {
+		return false
+	}
+	m.logger.Warn("object opcode applied to object 0, which S 12.3 calls \"nothing\"",
+		slog.Uint64("pc", uint64(inst.addr)),
+		slog.String("opcode", inst.op.String()))
+	return true
+}
 
 // objectAddress returns the byte address of the entry for an object (S 12.3.1).
 //

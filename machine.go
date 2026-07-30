@@ -158,8 +158,13 @@ type Result struct {
 	// StatusLine is the status line as of the moment execution stopped.
 	StatusLine StatusLine
 
-	// State is the resumable machine state. It is nil until Quetzal
-	// persistence is available.
+	// State is the resumable machine state, in the Quetzal saved-game format
+	// (spec S 22). Passing it to Restore on a Machine built from the same Story
+	// returns execution to the point this call stopped at.
+	//
+	// It is present whenever Status is WaitingForInput, which is the input
+	// boundary spec S 23 requires a snapshot at, and nil when Status is Halted,
+	// because a story that ended itself with quit has nothing to resume.
 	State []byte
 
 	// Status reports why execution stopped.

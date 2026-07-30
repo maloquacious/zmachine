@@ -318,13 +318,15 @@ func TestDecodeFailureStopsExecution(t *testing.T) {
 	}
 }
 
-// TestRestoreIsNotAvailable records that saved state is not part of this
-// build, so that a host gets a classifiable error rather than silently running
-// from the beginning of the story.
-func TestRestoreIsNotAvailable(t *testing.T) {
+// TestRestoreRejectsEmptyState records that a host which has no saved state
+// gets a classifiable error rather than a machine that silently runs from the
+// beginning of the story.
+func TestRestoreRejectsEmptyState(t *testing.T) {
 	m := newTestMachine(t)
-	if err := m.Restore(nil); !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("Restore() error = %v, want one wrapping ErrNotImplemented", err)
+	for _, data := range [][]byte{nil, {}} {
+		if err := m.Restore(data); !errors.Is(err, ErrInvalidState) {
+			t.Errorf("Restore(%v) error = %v, want one wrapping ErrInvalidState", data, err)
+		}
 	}
 }
 

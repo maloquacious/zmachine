@@ -1,7 +1,9 @@
 package zmachine
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"testing"
 )
@@ -395,10 +397,13 @@ func TestAttributeOutOfRange(t *testing.T) {
 	}
 }
 
-// TestObjectZeroIsNothing covers S 12.3: object number 0 is used to mean
-// "nothing", "though there is formally no such object". Every accessor refuses
-// it instead of indexing the table one entry below the first.
-func TestObjectZeroIsNothing(t *testing.T) {
+// TestObjectZeroAccessorsRefuseIt covers S 12.3: object number 0 is used to
+// mean "nothing", "though there is formally no such object". Every accessor
+// refuses it instead of indexing the table one entry below the first.
+//
+// The opcodes above these accessors are deliberately more forgiving; see
+// TestObjectZeroOpcodesProduceNothing for why the two layers differ.
+func TestObjectZeroAccessorsRefuseIt(t *testing.T) {
 	m := familyFixture(t).memory()
 
 	checks := map[string]error{
@@ -806,12 +811,120 @@ func TestPrintObj(t *testing.T) {
 		}
 	})
 
-	t.Run("an invalid object number halts", func(t *testing.T) {
+	t.Run("an object number outside the table halts", func(t *testing.T) {
 		// S 15, print_obj: "If the object number is invalid, the interpreter
-		// should halt with a suitable error message."
-		code := encodeShort(0x0a, smallOp(0))
+		// should halt with a suitable error message." Object 255's entry lies
+		// beyond the fixture's dynamic memory, so it names no object at all.
+		code := encodeShort(0x0a, smallOp(255))
 		m := familyFixture(t).code(code...).machine()
 		assertExecutionError(t, stepErr(t, m), fixtureCodeBase, ErrExecutionFault)
+	})
+}
+
+// TestObjectZeroOpcodesProduceNothing covers the rule of S 12.3 that object 0
+// means "nothing" and that "there is formally no such object", together with
+// the error handling Appendix A recommends for a story that uses it anyway.
+//
+// Appendix A records that post-Infocom games most often go wrong by "trying to
+// perform illegal operations on object 0", that "many interpreters silently
+// ignored these errors", and that halting is only the strictest of four
+// suggested levels of error checking - one which "can also ruin gameplay". An
+// engine advancing a player's session on a server takes the tolerant level: the
+// operation produces the null result and the host hears about it through the
+// logger, so a bug in the story costs a diagnostic rather than the turn.
+func TestObjectZeroOpcodesProduceNothing(t *testing.T) {
+	// The fixture's objects give every one of these a visibly different answer
+	// if object 0 were treated as an object rather than as nothing.
+	// store is the number of the global the result goes to. Each of these
+	// instructions would leave a visibly different value in it if object 0 were
+	// treated as an object rather than as nothing.
+	const store = globalFirst
+	tests := []struct {
+		name string
+		code []byte
+	}{
+		{"get_parent", join(encodeShort(0x03, smallOp(0)), []byte{store})},
+		{"get_child", join(encodeShort(0x02, smallOp(0)), []byte{store}, branch1(true, 2))},
+		{"get_sibling", join(encodeShort(0x01, smallOp(0)), []byte{store}, branch1(true, 2))},
+		{"get_prop", join(encodeLong(0x11, smallOp(0), smallOp(1)), []byte{store})},
+		{"get_prop_addr", join(encodeLong(0x12, smallOp(0), smallOp(1)), []byte{store})},
+		{"get_next_prop", join(encodeLong(0x13, smallOp(0), smallOp(0)), []byte{store})},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := &captureHandler{}
+			f := familyFixture(t).code(tt.code...)
+			m, err := New(f.load(), WithRandomSeed(1), WithLogger(slog.New(handler)))
+			if err != nil {
+				t.Fatalf("New() error = %v, want nil", err)
+			}
+			mustStep(t, m)
+
+			got, err := m.readGlobal(globalFirst)
+			if err != nil {
+				t.Fatalf("readGlobal error = %v, want nil", err)
+			}
+			if got != 0 {
+				t.Errorf("stored %d, want 0", got)
+			}
+			if len(handler.records) == 0 {
+				t.Error("no diagnostic logged; the host must be able to see the story's bug")
+			}
+		})
+	}
+
+	t.Run("the tree is left alone", func(t *testing.T) {
+		// insert_obj and remove_obj on nothing must not disturb any real
+		// object, so the fixture's family is checked before and after.
+		handler := &captureHandler{}
+		code := join(
+			encodeLong(0x0e, smallOp(0), smallOp(1)), // insert_obj 0 1
+			encodeLong(0x0e, smallOp(2), smallOp(0)), // insert_obj 2 0
+			encodeShort(0x09, smallOp(0)),            // remove_obj 0
+			encodeShort(0x0a),                        // quit
+		)
+		f := familyFixture(t).code(code...)
+		m, err := New(f.load(), WithRandomSeed(1), WithLogger(slog.New(handler)))
+		if err != nil {
+			t.Fatalf("New() error = %v, want nil", err)
+		}
+		if _, err := m.Start(context.Background()); err != nil {
+			t.Fatalf("Start() error = %v, want nil", err)
+		}
+		for _, want := range []struct{ number, parent, sibling, child uint16 }{
+			{1, 0, 0, 2}, {2, 1, 3, 0}, {3, 1, 4, 0}, {4, 1, 0, 0},
+		} {
+			parent, sibling, child := relatives(t, m.mem, want.number)
+			if parent != want.parent || sibling != want.sibling || child != want.child {
+				t.Errorf("object %d = (parent %d, sibling %d, child %d), want (%d, %d, %d)",
+					want.number, parent, sibling, child, want.parent, want.sibling, want.child)
+			}
+		}
+		if len(handler.records) == 0 {
+			t.Error("no diagnostic logged")
+		}
+	})
+
+	t.Run("attributes of nothing are unset and unsettable", func(t *testing.T) {
+		// test_attr 0 5 must not branch, and set_attr 0 5 must not make it.
+		code := join(
+			encodeLong(0x0b, smallOp(0), smallOp(5)), // set_attr 0 5
+			// test_attr 0 5, branching on true past the four-byte store below.
+			encodeLong(0x0a, smallOp(0), smallOp(5)), branch1(true, 6),
+			encodeVar(count2OP, 0x0d, smallOp(globalFirst), smallOp(7)), // store $10 7
+			encodeShort(0x0a), // quit
+		)
+		m := familyFixture(t).code(code...).machine()
+		if _, err := m.Start(context.Background()); err != nil {
+			t.Fatalf("Start() error = %v, want nil", err)
+		}
+		got, err := m.readGlobal(globalFirst)
+		if err != nil {
+			t.Fatalf("readGlobal error = %v, want nil", err)
+		}
+		if got != 7 {
+			t.Errorf("global $10 = %d, want 7: test_attr on nothing must not branch", got)
+		}
 	})
 }
 

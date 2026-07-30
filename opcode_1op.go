@@ -91,6 +91,14 @@ func (m *Machine) execute1OP(inst *instruction, ops []uint16) (control, error) {
 		// S 15, get_sibling: store the next object in the tree, branching if it
 		// exists, that is if it is not 0. The result is stored whether or not
 		// the branch is taken.
+		if m.nothingObject(inst, a) {
+			// "Nothing" has no sibling, so 0 is stored and the branch is not
+			// taken.
+			if err := m.store(inst, objectNothing); err != nil {
+				return controlContinue, err
+			}
+			return m.branch(inst, false)
+		}
 		sibling, err := m.mem.objectSibling(a)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
@@ -103,6 +111,12 @@ func (m *Machine) execute1OP(inst *instruction, ops []uint16) (control, error) {
 	case opGetChild:
 		// S 15, get_child: store the first object contained in the object,
 		// branching if it exists.
+		if m.nothingObject(inst, a) {
+			if err := m.store(inst, objectNothing); err != nil {
+				return controlContinue, err
+			}
+			return m.branch(inst, false)
+		}
 		child, err := m.mem.objectChild(a)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
@@ -115,6 +129,9 @@ func (m *Machine) execute1OP(inst *instruction, ops []uint16) (control, error) {
 	case opGetParent:
 		// S 15, get_parent: store the parent object. S 15 notes that this "has
 		// no 'branch if exists' clause", unlike get_child and get_sibling.
+		if m.nothingObject(inst, a) {
+			return controlContinue, m.store(inst, objectNothing)
+		}
 		parent, err := m.mem.objectParent(a)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
@@ -133,6 +150,9 @@ func (m *Machine) execute1OP(inst *instruction, ops []uint16) (control, error) {
 	case opRemoveObj:
 		// S 15, remove_obj: detach the object from its parent. Its children
 		// remain in its possession.
+		if m.nothingObject(inst, a) {
+			return controlContinue, nil
+		}
 		if err := m.mem.removeObject(a); err != nil {
 			return controlContinue, m.fail(inst, err)
 		}
@@ -143,6 +163,10 @@ func (m *Machine) execute1OP(inst *instruction, ops []uint16) (control, error) {
 		// Z-encoded string in the header of its property table (S 12.4) and not
 		// a property. "If the object number is invalid, the interpreter should
 		// halt with a suitable error message."
+		if m.nothingObject(inst, a) {
+			// "Nothing" has no short name, so nothing is printed.
+			return controlContinue, nil
+		}
 		name, err := m.mem.objectShortName(a)
 		if err != nil {
 			return controlContinue, m.fail(inst, err)
